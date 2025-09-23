@@ -9,16 +9,13 @@ app.use(cors({
   origin: "*"
 }));
 
+connectDb();
+
 app.get("/", (_req, res) => {
   console.log("Hello, Algo Arena Backend!");
   res.send("Hello, Algo Arena Backend!");
 });
 
-(async () => {
-  await connectDb();
-  await User.init();
-
-  app.listen(port, () => {
-    console.log(`Backend running at http://localhost:${port}`);
-  });
-})();
+app.listen(port, () => {
+  console.log(`Backend running at http://localhost:${port}`);
+});
