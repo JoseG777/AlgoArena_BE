@@ -3,6 +3,7 @@ import cors from "cors";
 import { connectDb } from "./lib/db_connect";
 import { User } from "./model/User";
 import registerRoute from "./routes/register";
+import loginRoute from "./routes/login";
 
 const app = express();
 app.use(express.json()); 
@@ -19,6 +20,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use(registerRoute);
+app.use(loginRoute);
 
 app.listen(port, () => {
   console.log(`Backend running at http://localhost:${port}`);
