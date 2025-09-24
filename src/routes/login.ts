@@ -27,7 +27,6 @@ loginRoute.post("/login", async (req, res) => {
 
     try{
         const lookup = determineLookup(identifyingInput);
-        console.log(lookup);
         const user = await User.findOne(lookup);
         if(!user)
         {
