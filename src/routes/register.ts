@@ -1,11 +1,9 @@
 import { Router } from "express";
 import argon2 from 'argon2';
 import { User } from "../model/User";
+import { emailRegex, usernameRegex } from "../utils/validators";
 
 const registerRoute = Router();
-
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const usernameRegex = /^[a-zA-Z0-9]+$/;
 
 registerRoute.post("/register", async (req, res) => 
 {
