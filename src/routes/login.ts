@@ -31,7 +31,6 @@ loginRoute.post("/login", async (req, res) => {
         const user = await User.findOne(lookup);
         if(!user)
         {
-            console.log("failed here")
             return res.status(401).json({
                 error: "Invalid Credentials."
             })
