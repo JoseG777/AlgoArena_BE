@@ -23,6 +23,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction)
         return next();
     }
     catch(e){
-
+        console.error("Access token verification failed:", e);
+        return res.status(401).json({
+            error: "Invalid or expired access token."
+        });
     }
 }

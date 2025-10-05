@@ -63,7 +63,11 @@ loginRoute.post("/login", async (req, res) => {
         })
     }
     catch(e){
-    
+        console.error("Error during login:", e);
+
+        return res.status(500).json({
+            error: "Internal Server Error. Please try again later."
+        });
     }
 })
 

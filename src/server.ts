@@ -2,10 +2,10 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { connectDb } from "./lib/db_connect";
-import { User } from "./model/User";
 import registerRoute from "./routes/register";
 import loginRoute from "./routes/login";
 import meRoute from "./routes/me";
+import judge0Route from "./routes/judge0";
 
 const app = express();
 app.use(express.json());
@@ -26,6 +26,7 @@ app.get("/", (_req, res) => {
 app.use(registerRoute);
 app.use(loginRoute);
 app.use(meRoute);
+app.use(judge0Route);
 
 app.listen(port, () => {
   console.log(`Backend running at http://localhost:${port}`);
