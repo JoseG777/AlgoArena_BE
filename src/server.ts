@@ -1,13 +1,17 @@
 import express from "express";
+import http from "http";
 import cors from "cors";
+import { Server } from "socket.io";
 import cookieParser from "cookie-parser";
 import { connectDb } from "./lib/db_connect";
 import registerRoute from "./routes/register";
 import loginRoute from "./routes/login";
 import meRoute from "./routes/me";
 import judge0Route from "./routes/judge0";
+import { registerSocketHandlers } from "./realtime/socket";
 
 const app = express();
+const server = http.createServer(app);
 app.use(express.json());
 app.use(cookieParser()); 
 const port = 3001;
@@ -28,6 +32,16 @@ app.use(loginRoute);
 app.use(meRoute);
 app.use(judge0Route);
 
-app.listen(port, () => {
-  console.log(`Backend running at http://localhost:${port}`);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+registerSocketHandlers(io);
+
+server.listen(port, () => {
+  console.log(`Backend + Socket.IO running at http://localhost:${port}`);
 });
