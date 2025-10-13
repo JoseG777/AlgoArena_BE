@@ -1,17 +1,18 @@
 import { Server, Socket } from "socket.io";
 import { nanoid } from "nanoid";
-
+import cookie from "cookie";
+import { verifyAccess, type AccessClaims } from "../lib/jwt";
 
 type RoomCode = string;
 
+type AllowRule = { type: "username"; value: string };
 
 interface Room {
  users: Set<string>;
+ allow?: AllowRule | null;
 }
 
-
 const rooms: Record<RoomCode, Room> = {};
-
 
 function createPrivateRoomCode(): RoomCode {
  let code: string;
@@ -29,62 +30,118 @@ function deleteRoomIfEmpty(code: RoomCode) {
  }
 }
 
+function displayName(user: AccessClaims) {
+  return user.username ?? user.email ?? `user:${user.sub.slice(-6)}`;
+}
+
+function isAllowed(user: AccessClaims, rule?: AllowRule | null): boolean {
+  if (!rule) return true;
+  return user.username?.toLowerCase() === rule.value.toLowerCase();
+}
 
 export function registerSocketHandlers(io: Server) {
- io.on("connection", (socket: Socket) => {
-   console.log("User connected:", socket.id);
+  io.use((socket, next) => {
+    try {
+      const raw = socket.handshake.headers.cookie || "";
+      const parsed = cookie.parse(raw);
+      const token = parsed["access"];
+      if (!token) return next(new Error("UNAUTHORIZED"));
+      const claims = verifyAccess(token);
+      (socket.data as { user: AccessClaims }).user = claims;
+      return next();
+    } catch {
+      return next(new Error("UNAUTHORIZED"));
+    }
+  });
 
-
-   socket.on("createRoom", (callback: (payload: { roomCode: string }) => void) => {
-     const roomCode = createPrivateRoomCode();
-     rooms[roomCode] = { users: new Set([socket.id]) };
-     socket.join(roomCode);
-     console.log("Room created:", roomCode);
-     callback({ roomCode });
-   });
-
+  io.on("connection", (socket: Socket) => {
+    const { user } = socket.data as { user: AccessClaims };
 
    socket.on(
-     "joinRoom",
-     (roomCode: string, callback: (payload: { success?: true; roomCode?: string; error?: string }) => void) => {
-       const room = rooms[roomCode];
-       if (!room) {
-         return callback({ error: "Room not found" });
-       }
+      "createRoom",
+      (
+        opts:
+          | { allow?: { username?: string } }
+          | ((p: { roomCode: string }) => void),
+        maybeCb?: (payload: { roomCode: string }) => void
+      ) => {
+        const hasOpts = typeof opts === "object" && typeof (opts as any) !== "function";
+        const cb = (hasOpts ? maybeCb : opts) as (p: { roomCode: string }) => void;
+        const allowInput = (hasOpts ? (opts as any).allow : undefined) as
+          | { username?: string }
+          | undefined;
+
+        const roomCode = createPrivateRoomCode();
+        const room: Room = { users: new Set([socket.id]) };
+
+        if (allowInput?.username) {
+          room.allow = { type: "username", value: allowInput.username };
+        }
+
+        rooms[roomCode] = room;
+        socket.join(roomCode);
+
+        cb({ roomCode });
+
+        socket.emit("userJoined", { username: displayName(user) });
+      }
+    );
 
 
-       room.users.add(socket.id);
-       socket.join(roomCode);
-       console.log(socket.id, "joined room", roomCode);
+    socket.on(
+      "joinRoom",
+      async (
+        roomCode: string,
+        callback: (p: {
+          success?: true;
+          roomCode?: string;
+          error?: string;
+          members?: string[];
+        }) => void
+      ) => {
+        const room = rooms[roomCode];
+        if (!room) return callback({ error: "Room not found" });
+
+        if (!isAllowed(user, room.allow)) {
+          return callback({ error: "You are not allowed to join this room." });
+        }
+
+        room.users.add(socket.id);
+        socket.join(roomCode);
+
+        const members: string[] = [];
+        for (const sid of room.users) {
+          const s = io.sockets.sockets.get(sid);
+          const u = s?.data?.user as AccessClaims | undefined;
+          if (u) members.push(displayName(u));
+        }
+
+        socket.to(roomCode).emit("userJoined", { username: displayName(user) });
+
+        callback({ success: true, roomCode, members });
+      }
+    );
 
 
-       socket.to(roomCode).emit("userJoined", { socketId: socket.id });
+    socket.on("leaveRoom", (roomCode: string) => {
+      const room = rooms[roomCode];
+      if (!room) return;
+      if (room.users.delete(socket.id)) {
+        socket.leave(roomCode);
+        socket.to(roomCode).emit("userLeft", { username: displayName(user) });
+        deleteRoomIfEmpty(roomCode);
+      }
+    });
 
 
-       callback({ success: true, roomCode });
-     }
-   );
-
-
-   socket.on("leaveRoom", (roomCode: string) => {
-     const room = rooms[roomCode];
-     if (!room) return;
-     if (room.users.delete(socket.id)) {
-       socket.leave(roomCode);
-       socket.to(roomCode).emit("userLeft", { socketId: socket.id });
-       deleteRoomIfEmpty(roomCode);
-     }
-   });
-
-
-   socket.on("disconnect", () => {
-     console.log("User disconnected:", socket.id);
-     for (const [code, room] of Object.entries(rooms)) {
-       if (room.users.delete(socket.id)) {
-         socket.to(code).emit("userLeft", { socketId: socket.id });
-         deleteRoomIfEmpty(code);
-       }
-     }
-   });
- });
+    socket.on("disconnect", () => {
+      console.log("User disconnected:", socket.id);
+      for (const [code, room] of Object.entries(rooms)) {
+        if (room.users.delete(socket.id)) {
+          socket.to(code).emit("userLeft", { username: displayName(user) });
+          deleteRoomIfEmpty(code);
+        }
+      }
+    });
+  });
 }
