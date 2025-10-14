@@ -7,10 +7,14 @@ type RoomCode = string;
 
 interface Room {
  users: Set<string>;
+ timer?: NodeJS.Timeout;
+ timeLeft: number;
 }
 
 
 const rooms: Record<RoomCode, Room> = {};
+const ROOM_TIMER_DURATION = 30; // in seconds
+const TIMER_INTERVAL = 1000; // 1 second
 
 
 function createPrivateRoomCode(): RoomCode {
@@ -25,8 +29,40 @@ function createPrivateRoomCode(): RoomCode {
 function deleteRoomIfEmpty(code: RoomCode) {
  const room = rooms[code];
  if (room && room.users.size === 0) {
+   if (room.timer) clearInterval(room.timer);
    delete rooms[code];
  }
+}
+
+function startRoomTimer(io: Server, roomCode: RoomCode) {
+  const room = rooms[roomCode];
+  if (!room) return;
+
+  room.timeLeft = ROOM_TIMER_DURATION;
+
+  room.timer = setInterval(() => {
+    if (!rooms[roomCode]) return;
+
+    room.timeLeft--;
+
+    // Emit to everyone in the room
+    io.to(roomCode).emit("timerUpdate", { timeLeft: room.timeLeft });
+
+    if (room.timeLeft <= 0) {
+      clearInterval(room.timer);
+      io.to(roomCode).emit("roomClosed");
+
+      // Disconnect all users from the room
+      for (const userId of room.users) {
+        const socket = io.sockets.sockets.get(userId);
+        if (socket) {
+          socket.leave(roomCode);
+        }
+      }
+
+      delete rooms[roomCode];
+    }
+  }, TIMER_INTERVAL);
 }
 
 
@@ -37,10 +73,12 @@ export function registerSocketHandlers(io: Server) {
 
    socket.on("createRoom", (callback: (payload: { roomCode: string }) => void) => {
      const roomCode = createPrivateRoomCode();
-     rooms[roomCode] = { users: new Set([socket.id]) };
+     rooms[roomCode] = { users: new Set([socket.id]), timeLeft: ROOM_TIMER_DURATION };
      socket.join(roomCode);
      console.log("Room created:", roomCode);
      callback({ roomCode });
+
+     startRoomTimer(io, roomCode); // Start timer after creation
    });
 
 
