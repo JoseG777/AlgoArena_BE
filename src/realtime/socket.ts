@@ -10,7 +10,12 @@ type AllowRule = { type: "username"; value: string };
 interface Room {
  users: Set<string>;
  allow?: AllowRule | null;
+ timer?: NodeJS.Timeout;
+ timeLeft: number;   
 }
+
+const ROOM_TIMER_DURATION = 30; // seconds
+const TIMER_INTERVAL = 1000;    // 1 second
 
 const rooms: Record<RoomCode, Room> = {};
 
@@ -26,6 +31,7 @@ function createPrivateRoomCode(): RoomCode {
 function deleteRoomIfEmpty(code: RoomCode) {
  const room = rooms[code];
  if (room && room.users.size === 0) {
+   if (room.timer) clearInterval(room.timer);
    delete rooms[code];
  }
 }
@@ -37,6 +43,37 @@ function displayName(user: AccessClaims) {
 function isAllowed(user: AccessClaims, rule?: AllowRule | null): boolean {
   if (!rule) return true;
   return user.username?.toLowerCase() === rule.value.toLowerCase();
+}
+
+function startRoomTimer(io: Server, roomCode: RoomCode) {
+  const room = rooms[roomCode];
+  if (!room) return;
+
+  if (room.timer) clearInterval(room.timer);
+
+  room.timeLeft = ROOM_TIMER_DURATION; 
+
+  io.to(roomCode).emit("timerUpdate", { timeLeft: room.timeLeft });
+
+  room.timer = setInterval(() => {
+    const r = rooms[roomCode];
+    if (!r) return;
+
+    r.timeLeft -= 1;
+    io.to(roomCode).emit("timerUpdate", { timeLeft: r.timeLeft }); 
+
+    if (r.timeLeft <= 0) {
+      clearInterval(r.timer);
+      io.to(roomCode).emit("roomClosed");
+
+      for (const sid of r.users) {
+        const s = io.sockets.sockets.get(sid);
+        s?.leave(roomCode);
+      }
+
+      delete rooms[roomCode];
+    }
+  }, TIMER_INTERVAL);
 }
 
 export function registerSocketHandlers(io: Server) {
@@ -72,7 +109,10 @@ export function registerSocketHandlers(io: Server) {
           | undefined;
 
         const roomCode = createPrivateRoomCode();
-        const room: Room = { users: new Set([socket.id]) };
+        const room: Room = { 
+          users: new Set([socket.id]),
+          timeLeft: ROOM_TIMER_DURATION,
+        };
 
         if (allowInput?.username) {
           room.allow = { type: "username", value: allowInput.username };
@@ -84,6 +124,8 @@ export function registerSocketHandlers(io: Server) {
         cb({ roomCode });
 
         socket.emit("userJoined", { username: displayName(user) });
+
+        startRoomTimer(io, roomCode);
       }
     );
 
