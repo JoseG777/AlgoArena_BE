@@ -8,8 +8,8 @@ interface IRequest {
 
 const FriendRequestSchema = new Schema<IRequest>(
    {
-      requester: {type: String, required: true},
-      recipient: {type: String, required: true,
+      requester: {type: String, required: true, index: true},
+      recipient: {type: String, required: true, index: true,
          validate: {
             validator: function (value: string) {
                return value !== this.requester;
