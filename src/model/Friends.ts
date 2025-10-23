@@ -17,14 +17,14 @@ const FriendshipSchema = new Schema<IFriends>(
    }
 );
 
-// FriendshipSchema.pre('save', function (next) {
-//    if (this.userA > this.userB) {
-//       const temp = this.userA;
-//       this.userA = this.userB;
-//       this.userB = temp;
-//    }
-//    next();
-// });
+FriendshipSchema.pre('save', function (next) {
+   if (this.userA > this.userB) {
+      const temp = this.userA;
+      this.userA = this.userB;
+      this.userB = temp;
+   }
+   next();
+});
 
 FriendshipSchema.index({userA: 1, userB: 1}, {unique: true});
 
