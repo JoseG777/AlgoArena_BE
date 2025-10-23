@@ -177,7 +177,6 @@ export function registerSocketHandlers(io: Server) {
 
 
     socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id);
       for (const [code, room] of Object.entries(rooms)) {
         if (room.users.delete(socket.id)) {
           socket.to(code).emit("userLeft", { username: displayName(user) });
