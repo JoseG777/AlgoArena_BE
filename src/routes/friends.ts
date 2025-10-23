@@ -103,4 +103,93 @@ friendRoute.get('/friend-requests/incoming', requireAuth, async (req: Request, r
    }
 });
 
+friendRoute.post('/friend-requests/:id/accept', requireAuth, async (req: Request, res) => {
+  try {
+    const { user } = req as AuthenticatedRequest;
+    const actingUserId = String(user.sub);
+    const requestId = String(req.params.id);
+
+    const fr = await FriendRequest.findById(requestId);
+    if (!fr) return res.status(404).json({ error: 'Request not found' });
+
+    if (String(fr.recipient) !== actingUserId) {
+      return res.status(403).json({ error: 'Only the recipient can accept' });
+    }
+
+    const a = String(fr.requester) < String(fr.recipient) ? String(fr.requester) : String(fr.recipient);
+    const b = String(fr.requester) < String(fr.recipient) ? String(fr.recipient) : String(fr.requester);
+
+    try {
+      await Friends.create({ userA: a, userB: b });
+    } catch (e: any) {
+      const isDup = e?.code === 11000 || /duplicate key/i.test(String(e?.message));
+      if (!isDup) throw e;
+    }
+
+    await FriendRequest.deleteOne({ _id: fr._id });
+
+    return res.json({ ok: true });
+  } catch (err: any) {
+    console.error('accept error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+friendRoute.post('/friend-requests/:id/reject', requireAuth, async (req: Request, res) => {
+  try {
+    const { user } = req as AuthenticatedRequest;
+    const actingUserId = String(user.sub);
+    const requestId = String(req.params.id);
+
+    const fr = await FriendRequest.findById(requestId);
+    if (!fr) return res.status(404).json({ error: 'Request not found' });
+
+    if (String(fr.recipient) !== actingUserId) {
+      return res.status(403).json({ error: 'Only the recipient can reject' });
+    }
+
+    await FriendRequest.deleteOne({ _id: fr._id });
+    return res.json({ ok: true });
+  } catch (err: any) {
+    console.error('reject error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+friendRoute.get('/friends', requireAuth, async (req: Request, res) => {
+  try {
+    const { user } = req as AuthenticatedRequest;
+    const myId = String(user.sub);
+
+    const friendships = await Friends.find({
+      $or: [{ userA: myId }, { userB: myId }],
+    }).lean();
+
+    if (!friendships.length) {
+      return res.json([]);
+    }
+
+    const friendIds = friendships.map(f =>
+      f.userA === myId ? f.userB : f.userA
+    );
+
+    const users = await User.find(
+      { _id: { $in: friendIds } },
+      { username: 1 }
+    ).lean();
+
+    const usernameById = new Map(users.map(u => [String(u._id), u.username]));
+
+    const result = friendIds.map(id => ({
+      id,
+      username: usernameById.get(id) ?? '(unknown)',
+    }));
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('friends list error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default friendRoute;
