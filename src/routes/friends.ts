@@ -163,7 +163,7 @@ friendRoute.get('/friends', requireAuth, async (req: Request, res) => {
 
     const friendships = await Friends.find({
       $or: [{ userA: myId }, { userB: myId }],
-    }).lean();
+    }).sort({ date: -1 }).lean();
 
     if (!friendships.length) {
       return res.json([]);
@@ -180,10 +180,15 @@ friendRoute.get('/friends', requireAuth, async (req: Request, res) => {
 
     const usernameById = new Map(users.map(u => [String(u._id), u.username]));
 
-    const result = friendIds.map(id => ({
-      id,
-      username: usernameById.get(id) ?? '(unknown)',
-    }));
+    const result = friendships.map(f => {
+      const otherId = f.userA === myId ? f.userB : f.userA;
+      const dateOnly = new Date(f.date).toISOString().split('T')[0];
+      return {
+        id: otherId,
+        username: usernameById.get(String(otherId)) ?? '(unknown)',
+        date: dateOnly
+      };
+    });
 
     return res.json(result);
   } catch (err: any) {
