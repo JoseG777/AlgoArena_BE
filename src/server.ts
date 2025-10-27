@@ -1,31 +1,33 @@
-import express from "express";
-import http from "http";
-import cors from "cors";
-import { Server } from "socket.io";
-import cookieParser from "cookie-parser";
-import { connectDb } from "./lib/db_connect";
-import registerRoute from "./routes/register";
-import loginRoute from "./routes/login";
-import meRoute from "./routes/me";
-import judge0Route from "./routes/judge0";
-import friendRoute from "./routes/friends";
-import { registerSocketHandlers } from "./realtime/socket";
+import express from 'express';
+import http from 'http';
+import cors from 'cors';
+import { Server } from 'socket.io';
+import cookieParser from 'cookie-parser';
+import { connectDb } from './lib/db_connect';
+import registerRoute from './routes/register';
+import loginRoute from './routes/login';
+import meRoute from './routes/me';
+import judge0Route from './routes/judge0';
+import friendRoute from './routes/friends';
+import { registerSocketHandlers } from './realtime/socket';
 
 const app = express();
 const server = http.createServer(app);
 app.use(express.json());
-app.use(cookieParser()); 
+app.use(cookieParser());
 const port = 3001;
-app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  }),
+);
 
 connectDb();
 
-app.get("/", (_req, res) => {
-  console.log("Hello, Algo Arena Backend!");
-  res.send("Hello, Algo Arena Backend!");
+app.get('/', (_req, res) => {
+  console.log('Hello, Algo Arena Backend!');
+  res.send('Hello, Algo Arena Backend!');
 });
 
 app.use(registerRoute);
@@ -36,8 +38,8 @@ app.use(friendRoute);
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"],
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST'],
     credentials: true,
   },
 });

@@ -1,10 +1,13 @@
-import { Router } from "express";
+import { Router } from 'express';
+import NodeCache from 'node-cache';
+import { requireAuth, AuthenticatedRequest } from '../middleware/requireAuth';
 
 const judge0Route = Router();
+const cache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
 
 function b64dec(s?: string | null) {
-  if (!s) return "";
-  return Buffer.from(s, "base64").toString("utf8");
+  if (!s) return '';
+  return Buffer.from(s, 'base64').toString('utf8');
 }
 
 function clamp(n: number, lo: number, hi: number) {
@@ -12,7 +15,7 @@ function clamp(n: number, lo: number, hi: number) {
 }
 
 function safeParseFloat(s?: string | null) {
-  const v = parseFloat(String(s ?? "0"));
+  const v = parseFloat(String(s ?? '0'));
   return Number.isFinite(v) ? v : 0;
 }
 
@@ -47,7 +50,7 @@ function parsePassFail(stdout: string) {
     const m = line.match(/Case\s+\d+:\s+(PASS|FAIL)/i);
     if (m) {
       total++;
-      if (m[1].toUpperCase() === "PASS") pass++;
+      if (m[1].toUpperCase() === 'PASS') pass++;
       else fail++;
     }
   }
@@ -55,7 +58,7 @@ function parsePassFail(stdout: string) {
 }
 
 function gradeFromJudge0(judge0: any) {
-  const statusDesc = judge0?.status?.description || "Unknown";
+  const statusDesc = judge0?.status?.description || 'Unknown';
   const timeStr = judge0?.time ?? null;
   const memoryKB = judge0?.memory ?? null;
 
@@ -68,10 +71,10 @@ function gradeFromJudge0(judge0: any) {
 
   if (/Compilation Error/i.test(statusDesc)) {
     score += WEIGHTS.CE;
-    breakdown["compilePenalty"] = WEIGHTS.CE;
+    breakdown['compilePenalty'] = WEIGHTS.CE;
   } else if (!/Accepted/i.test(statusDesc)) {
     score += WEIGHTS.RUNTIME;
-    breakdown["runtimePenalty"] = WEIGHTS.RUNTIME;
+    breakdown['runtimePenalty'] = WEIGHTS.RUNTIME;
   }
 
   const { pass, fail, total } = parsePassFail(stdout);
@@ -79,26 +82,26 @@ function gradeFromJudge0(judge0: any) {
     const sPass = pass * WEIGHTS.PER_PASS;
     const sFail = fail * WEIGHTS.PER_FAIL;
     score += sPass + sFail;
-    breakdown["passes"] = pass;
-    breakdown["fails"] = fail;
-    breakdown["passPoints"] = sPass;
-    breakdown["failPoints"] = sFail;
+    breakdown['passes'] = pass;
+    breakdown['fails'] = fail;
+    breakdown['passPoints'] = sPass;
+    breakdown['failPoints'] = sFail;
   }
 
   if (stderr.trim()) {
     score += WEIGHTS.STDERR;
-    breakdown["stderrPenalty"] = WEIGHTS.STDERR;
+    breakdown['stderrPenalty'] = WEIGHTS.STDERR;
   }
 
   const tPen = -timePenaltySec(timeStr);
   const mPen = -memoryPenaltyKb(memoryKB);
   score += tPen + mPen;
-  breakdown["timePenalty"] = tPen;
-  breakdown["memoryPenalty"] = mPen;
+  breakdown['timePenalty'] = tPen;
+  breakdown['memoryPenalty'] = mPen;
 
   const finalScore = clamp(score, GRADING_LIMITS.MIN, GRADING_LIMITS.MAX);
-  breakdown["rawScore"] = score;
-  breakdown["finalScore"] = finalScore;
+  breakdown['rawScore'] = score;
+  breakdown['finalScore'] = finalScore;
 
   return {
     status: statusDesc,
@@ -112,34 +115,54 @@ function gradeFromJudge0(judge0: any) {
   };
 }
 
-judge0Route.post("/judge0/run", async (req, res) => {
+type UserTotal = { total: number };
+
+judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
   const { language_id, source_code, stdin } = req.body;
+  const { user } = req as AuthenticatedRequest;
+  const userId = String(user.sub);
 
   try {
     const apiRes = await fetch(
-      "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true",
+      'https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true',
       {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "content-type": "application/json",
-          "x-rapidapi-key": process.env.RAPIDAPI_KEY!,
-          "x-rapidapi-host": "judge0-ce.p.rapidapi.com",
+          'content-type': 'application/json',
+          'x-rapidapi-key': process.env.RAPIDAPI_KEY!,
+          'x-rapidapi-host': 'judge0-ce.p.rapidapi.com',
         },
         body: JSON.stringify({
           language_id,
           source_code,
           stdin,
         }),
-      }
+      },
     );
 
     const judge0 = await apiRes.json();
     const graded = gradeFromJudge0(judge0);
 
-    res.status(apiRes.ok ? 200 : 400).json(graded);
+    const current = cache.get<UserTotal>(userId);
+    const prevTotal = current?.total ?? 0;
+
+    const newTotal = prevTotal + graded.score;
+
+    cache.set<UserTotal>(userId, { total: newTotal });
+
+    return res.status(apiRes.ok ? 200 : 400).json({
+      status: graded.status,
+      time: graded.time,
+      memory: graded.memory,
+      stdout: graded.stdout,
+      stderr: graded.stderr,
+      compile_output: graded.compile_output,
+      score: newTotal,
+      breakdown: graded.breakdown,
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Judge0 run failed" });
+    res.status(500).json({ error: 'Judge0 run failed' });
   }
 });
 

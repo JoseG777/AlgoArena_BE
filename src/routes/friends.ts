@@ -10,10 +10,10 @@ friendRoute.post('/friend-requests', requireAuth, async (req: Request, res) => {
   try {
     const { user } = req as AuthenticatedRequest;
     const requesterIdFromToken = String(user.sub);
-    
+
     const {
       recipientUsername,
-      requesterId: requesterIdFromBody, 
+      requesterId: requesterIdFromBody,
     }: { recipientUsername?: string; requesterId?: string } = req.body || {};
 
     if (!recipientUsername || !recipientUsername.trim()) {
@@ -65,11 +65,10 @@ friendRoute.post('/friend-requests', requireAuth, async (req: Request, res) => {
     return res.status(201).json({
       recipientUsername: recipientUser.username,
     });
-
-   } catch (err: any) {
+  } catch (err: any) {
     console.error('friend-requests error:', err);
     return res.status(500).json({ error: 'Internal Server Error' });
-   }
+  }
 });
 
 friendRoute.get('/friend-requests/incoming', requireAuth, async (req: Request, res) => {
@@ -96,11 +95,10 @@ friendRoute.get('/friend-requests/incoming', requireAuth, async (req: Request, r
     }));
 
     return res.json(data);
-    
-   } catch (e: any) {
-      console.error('incoming list error:', e);
-      return res.status(500).json({ error: 'Internal Server Error' });
-   }
+  } catch (e: any) {
+    console.error('incoming list error:', e);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 friendRoute.post('/friend-requests/:id/accept', requireAuth, async (req: Request, res) => {
@@ -116,8 +114,10 @@ friendRoute.post('/friend-requests/:id/accept', requireAuth, async (req: Request
       return res.status(403).json({ error: 'Only the recipient can accept' });
     }
 
-    const a = String(fr.requester) < String(fr.recipient) ? String(fr.requester) : String(fr.recipient);
-    const b = String(fr.requester) < String(fr.recipient) ? String(fr.recipient) : String(fr.requester);
+    const a =
+      String(fr.requester) < String(fr.recipient) ? String(fr.requester) : String(fr.recipient);
+    const b =
+      String(fr.requester) < String(fr.recipient) ? String(fr.recipient) : String(fr.requester);
 
     try {
       await Friends.create({ userA: a, userB: b });
@@ -163,20 +163,17 @@ friendRoute.get('/friends', requireAuth, async (req: Request, res) => {
 
     const friendships = await Friends.find({
       $or: [{ userA: myId }, { userB: myId }],
-    }).sort({ date: -1 }).lean();
+    })
+      .sort({ date: -1 })
+      .lean();
 
     if (!friendships.length) {
       return res.json([]);
     }
 
-    const friendIds = friendships.map(f =>
-      f.userA === myId ? f.userB : f.userA
-    );
+    const friendIds = friendships.map(f => (f.userA === myId ? f.userB : f.userA));
 
-    const users = await User.find(
-      { _id: { $in: friendIds } },
-      { username: 1 }
-    ).lean();
+    const users = await User.find({ _id: { $in: friendIds } }, { username: 1 }).lean();
 
     const usernameById = new Map(users.map(u => [String(u._id), u.username]));
 
@@ -186,7 +183,7 @@ friendRoute.get('/friends', requireAuth, async (req: Request, res) => {
       return {
         id: otherId,
         username: usernameById.get(String(otherId)) ?? '(unknown)',
-        date: dateOnly
+        date: dateOnly,
       };
     });
 

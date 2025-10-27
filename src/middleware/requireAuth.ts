@@ -1,31 +1,28 @@
-import { Request, Response, NextFunction } from "express";
-import { verifyAccess, AccessClaims } from "../lib/jwt";
+import { Request, Response, NextFunction } from 'express';
+import { verifyAccess, AccessClaims } from '../lib/jwt';
 
 export interface AuthenticatedRequest extends Request {
-    user: AccessClaims;
+  user: AccessClaims;
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction)
-{
-    const token = req.cookies.access;
-    if(!token)
-    {
-        return res.status(401).json({
-            error: "Missing access token!"
-        })
-    }
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const token = req.cookies.access;
+  if (!token) {
+    return res.status(401).json({
+      error: 'Missing access token!',
+    });
+  }
 
-    try{
-        const claims = verifyAccess(token);
+  try {
+    const claims = verifyAccess(token);
 
-        (req as Request & { user?: AccessClaims }).user = claims;
+    (req as Request & { user?: AccessClaims }).user = claims;
 
-        return next();
-    }
-    catch(e){
-        console.error("Access token verification failed:", e);
-        return res.status(401).json({
-            error: "Invalid or expired access token."
-        });
-    }
+    return next();
+  } catch (e) {
+    console.error('Access token verification failed:', e);
+    return res.status(401).json({
+      error: 'Invalid or expired access token.',
+    });
+  }
 }
