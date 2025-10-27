@@ -118,10 +118,18 @@ function gradeFromJudge0(judge0: any) {
 type UserTotal = { total: number };
 
 judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
-  const { language_id, source_code, stdin } = req.body;
+  const { language_id, source_code, stdin, problemId } = req.body;
   const { user } = req as AuthenticatedRequest;
   const userId = String(user.sub);
+/*
+{
+  language_id: 74,
+  source_code: 'ZnVuY3Rpb24gdHdvU3VtKG51bXM6IG51bWJlcltdLCB0YXJnZXQ6IG51bWJlcik6IG51bWJlcltdIHsKICBjb25zdCBsb29rdXA6IFJlY29yZDxudW1iZXIsIG51bWJlcj4gPSB7fTsKICBmb3IgKGxldCBpID0gMDsgaSA8IG51bXMubGVuZ3RoOyBpKyspIHsKICAgIGNvbnN0IGRpZmYgPSB0YXJnZXQgLSBudW1zW2ldOwogICAgaWYgKGxvb2t1cFtkaWZmXSAhPT0gdW5kZWZpbmVkKSB7CiAgICAgIHJldHVybiBbbG9va3VwW2RpZmZdLCBpXTsKICAgIH0KICAgIGxvb2t1cFtudW1zW2ldXSA9IGk7CiAgfQogIHJldHVybiBbXTsKfQoKCmZ1bmN0aW9uIHJ1blRlc3RzKCkgewogIGNvbnN0IHRlc3RDYXNlczogeyBhcmdzOiBbbnVtYmVyW10sIG51bWJlcl07IGV4cGVjdGVkOiBudW1iZXJbXSB9W10gPSBbCiAgICB7IGFyZ3M6IFtbMiwgNywgMTEsIDE1XSwgOV0sIGV4cGVjdGVkOiBbMCwgMV0gfSwKICAgIHsgYXJnczogW1szLCAyLCA0XSwgNl0sIGV4cGVjdGVkOiBbMSwgMl0gfSwKICAgIHsgYXJnczogW1szLCAzXSwgNl0sIGV4cGVjdGVkOiBbMCwgMV0gfSwKICAgIHsgYXJnczogW1sxLCAyLCAzXSwgN10sIGV4cGVjdGVkOiBbXSB9LAogIF07CgogIHRlc3RDYXNlcy5mb3JFYWNoKCh0YywgaSkgPT4gewogICAgY29uc3QgcmVzdWx0ID0gdHdvU3VtKC4uLnRjLmFyZ3MpOwogICAgY29uc29sZS5sb2coCiAgICAgICJDYXNlICIgKyAoaSArIDEpICsgIjogIiArCiAgICAgIChKU09OLnN0cmluZ2lmeShyZXN1bHQpID09PSBKU09OLnN0cmluZ2lmeSh0Yy5leHBlY3RlZCkgPyAiUEFTUyIgOiAiRkFJTCIpICsKICAgICAgIiB8IEdvdCAiICsgSlNPTi5zdHJpbmdpZnkocmVzdWx0KSArCiAgICAgICIsIEV4cGVjdGVkICIgKyBKU09OLnN0cmluZ2lmeSh0Yy5leHBlY3RlZCkKICAgICk7CiAgfSk7Cn0KCnJ1blRlc3RzKCk7Cg==',
+  problemId: 'two-sum',
+  gameStartTs: 1761579377624
+}
 
+*/
   try {
     const apiRes = await fetch(
       'https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true',
@@ -140,15 +148,17 @@ judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
       },
     );
 
+    const cacheKey = `${userId}:${problemId}`
+
     const judge0 = await apiRes.json();
     const graded = gradeFromJudge0(judge0);
 
-    const current = cache.get<UserTotal>(userId);
+    const current = cache.get<UserTotal>(cacheKey);
     const prevTotal = current?.total ?? 0;
 
     const newTotal = prevTotal + graded.score;
-
-    cache.set<UserTotal>(userId, { total: newTotal });
+    
+    cache.set<UserTotal>(cacheKey, { total: newTotal });
 
     return res.status(apiRes.ok ? 200 : 400).json({
       status: graded.status,
