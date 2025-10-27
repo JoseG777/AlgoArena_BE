@@ -3,7 +3,7 @@ import NodeCache from 'node-cache';
 import { requireAuth, AuthenticatedRequest } from '../middleware/requireAuth';
 
 const judge0Route = Router();
-const cache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 120 });
 
 function b64dec(s?: string | null) {
   if (!s) return '';
