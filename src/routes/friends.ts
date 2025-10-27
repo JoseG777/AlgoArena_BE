@@ -194,4 +194,42 @@ friendRoute.get('/friends', requireAuth, async (req: Request, res) => {
   }
 });
 
+friendRoute.delete('/friends/:username', requireAuth, async (req: Request, res) => {
+  try {
+    const { user } = req as AuthenticatedRequest;
+    const myId = String(user.sub);
+    const friendUsername = (req.params.username || '').trim();
+
+    if (!friendUsername) {
+      return res.status(400).json({ error: 'Friend username required' });
+    }
+
+    const friendUser = await User.findOne({ username: friendUsername }).lean();
+    if (!friendUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const friendId = String(friendUser._id);
+    if (friendId === myId) {
+      return res.status(400).json({ error: 'Cannot remove yourself' });
+    }
+
+    const friendship = await Friends.findOneAndDelete({
+      $or: [
+        { userA: myId, userB: friendId },
+        { userA: friendId, userB: myId },
+      ],
+    });
+
+    if (!friendship) {
+      return res.status(404).json({ error: 'Friendship not found' });
+    }
+
+    return res.json({ message: `Removed ${friendUsername} from friends` });
+  } catch (err: any) {
+    console.error('remove friend error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default friendRoute;
