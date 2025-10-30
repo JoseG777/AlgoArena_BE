@@ -9,6 +9,7 @@ import loginRoute from './routes/login';
 import meRoute from './routes/me';
 import judge0Route from './routes/judge0';
 import friendRoute from './routes/friends';
+import logoutRoute from './routes/logout';
 import { registerSocketHandlers } from './realtime/socket';
 
 const app = express();
@@ -35,6 +36,7 @@ app.use(loginRoute);
 app.use(meRoute);
 app.use(judge0Route);
 app.use(friendRoute);
+app.use(logoutRoute);
 
 const io = new Server(server, {
   cors: {
