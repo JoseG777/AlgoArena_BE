@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import NodeCache from 'node-cache';
 import { requireAuth, AuthenticatedRequest } from '../middleware/requireAuth';
+import { Problem } from '../model/Problem';
 
 const judge0Route = Router();
 const cache = new NodeCache({ stdTTL: 300, checkperiod: 120 });
@@ -8,6 +9,10 @@ const cache = new NodeCache({ stdTTL: 300, checkperiod: 120 });
 function b64dec(s?: string | null) {
   if (!s) return '';
   return Buffer.from(s, 'base64').toString('utf8');
+}
+
+function b64enc(s: string) {
+  return Buffer.from(s, 'utf8').toString('base64');
 }
 
 function clamp(n: number, lo: number, hi: number) {
@@ -118,11 +123,37 @@ function gradeFromJudge0(judge0: any) {
 type UserTotal = { total: number };
 
 judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
-  const { language_id, source_code, stdin, problemId } = req.body;
+  const { language_id, source_code, stdin, problemId, lang } = req.body as {
+    language_id: number;
+    source_code: string;
+    stdin?: string;
+    problemId: string;
+    lang: 'typescript' | 'python';
+  };
+
+  if (!problemId || (lang !== 'typescript' && lang !== 'python')) {
+    return res.status(400).json({ error: 'Invalid problemId or lang' });
+  }
+
   const { user } = req as AuthenticatedRequest;
   const userId = String(user.sub);
 
   try {
+    const problem = await Problem.findOne(
+      { problemId },
+      { _id: 0, [`testHarness.${lang}`]: 1 },
+    ).lean();
+
+    if (!problem) {
+      return res.status(404).json({ error: 'Problem not found' });
+    }
+
+    const harness = (problem as any)?.testHarness?.[lang] || '';
+
+    const userSrc = b64dec(source_code);
+    const fullSource = `${userSrc}\n\n${harness}`;
+    const fullSourceB64 = b64enc(fullSource);
+
     const apiRes = await fetch(
       'https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true',
       {
@@ -134,22 +165,19 @@ judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
         },
         body: JSON.stringify({
           language_id,
-          source_code,
+          source_code: fullSourceB64,
           stdin,
         }),
       },
     );
 
     const cacheKey = `${userId}:${problemId}`;
-
     const judge0 = await apiRes.json();
     const graded = gradeFromJudge0(judge0);
 
     const current = cache.get<UserTotal>(cacheKey);
     const prevTotal = current?.total ?? 0;
-
     const newTotal = prevTotal + graded.score;
-
     cache.set<UserTotal>(cacheKey, { total: newTotal });
 
     return res.status(apiRes.ok ? 200 : 400).json({
