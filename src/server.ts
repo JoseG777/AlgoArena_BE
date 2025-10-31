@@ -11,6 +11,7 @@ import judge0Route from './routes/judge0';
 import friendRoute from './routes/friends';
 import logoutRoute from './routes/logout';
 import { registerSocketHandlers } from './realtime/socket';
+import triviaRoutes from "./routes/trivia";
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +38,7 @@ app.use(meRoute);
 app.use(judge0Route);
 app.use(friendRoute);
 app.use(logoutRoute);
+app.use(triviaRoutes);
 
 const io = new Server(server, {
   cors: {
