@@ -12,6 +12,7 @@ import friendRoute from './routes/friends';
 import logoutRoute from './routes/logout';
 import { registerSocketHandlers } from './realtime/socket';
 
+
 const app = express();
 const server = http.createServer(app);
 app.use(express.json());
@@ -35,7 +36,7 @@ app.use(registerRoute);
 app.use(loginRoute);
 app.use(meRoute);
 app.use(judge0Route);
-app.use(friendRoute);
+app.use("/api",friendRoute);
 app.use(logoutRoute);
 
 const io = new Server(server, {

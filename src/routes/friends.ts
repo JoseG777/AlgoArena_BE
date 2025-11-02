@@ -4,6 +4,8 @@ import { FriendRequest } from '../model/FriendRequest';
 import { Friends } from '../model/Friends';
 import { User } from '../model/User';
 
+
+
 const friendRoute = Router();
 
 friendRoute.post('/friend-requests', requireAuth, async (req: Request, res) => {
