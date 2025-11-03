@@ -25,7 +25,8 @@ friendRoute.post('/friend-requests', requireAuth, async (req: Request, res) => {
     }
 
     const requesterId = requesterIdFromToken;
-    const recipientUser = await User.findOne({ username: recipientUsername.trim() }).lean();
+    const normalizedRecipientUsername = recipientUsername.trim().toLowerCase();
+    const recipientUser = await User.findOne({ username: normalizedRecipientUsername.trim() }).lean();
 
     if (!recipientUser) {
       return res.status(404).json({ error: 'User not found' });
