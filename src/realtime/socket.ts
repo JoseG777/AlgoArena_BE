@@ -10,10 +10,14 @@ import {
   type AllowRule,
 } from './roomsStore';
 
-const memberScores: Record<string, { username: string; score: number }> = {};
+const memberScores: Record<RoomCode, Record<string, { username: string; score: number }>> = {};
 
 function displayName(user: AccessClaims) {
   return user.username ?? user.email ?? `user:${user.sub.slice(-6)}`;
+}
+
+function getUserId(user: AccessClaims) {
+  return user.username || `user:${user.sub.slice(-6)}`;
 }
 
 function isAllowed(user: AccessClaims, rule?: AllowRule | null): boolean {
@@ -45,19 +49,17 @@ export function registerSocketHandlers(io: Server) {
 
   io.on('connection', (socket: Socket) => {
     const { user } = socket.data as { user: AccessClaims };
+    const userId = getUserId(user);
 
     socket.on(
       'joinRoom',
-      (
-        roomCode: string,
-        callback: (p: {
-          success?: true;
-          roomCode?: string;
-          error?: string;
-          members?: string[];
-          timeLeft?: number;
-        }) => void,
-      ) => {
+      (roomCode: string, callback: (p: {
+        success?: true;
+        roomCode?: string;
+        error?: string;
+        members?: string[];
+        timeLeft?: number;
+      }) => void) => {
         const code = String(roomCode) as RoomCode;
         const room = getRoomEntry(code);
         if (!room) return callback({ error: 'Room not found' });
@@ -67,38 +69,43 @@ export function registerSocketHandlers(io: Server) {
         }
 
         addUserToRoom(code, socket.id);
+
+        if (!memberScores[code]) memberScores[code] = {};
+        if (!memberScores[code][userId]) {
+          memberScores[code][userId] = { username: displayName(user), score: 0 };
+        }
+
         socket.join(code);
 
-        if (!memberScores[socket.id]) {
-          memberScores[socket.id] = { username: displayName(user), score: 0 };
-        }
+        const members = Array.from(room.users)
+          .map((sid) => {
+            const s = io.sockets.sockets.get(sid);
+            const u = s?.data?.user as AccessClaims | undefined;
+            if (u) return displayName(u);
+            return null;
+          })
+          .filter(Boolean) as string[];
 
-        const members: string[] = [];
-        for (const sid of room.users) {
-          const s = io.sockets.sockets.get(sid);
-          const u = s?.data?.user as AccessClaims | undefined;
-          if (u) members.push(displayName(u));
-        }
-
-        const membersWithScores = Object.values(memberScores).map(member => ({
-          username: member.username,
-          score: member.score,
-        }));
+        const membersWithScores = Object.values(memberScores[code]);
 
         socket.to(code).emit('userJoined', { username: displayName(user) });
-
-        callback({ success: true, roomCode: code, members, timeLeft: room.timeLeft });
         socket.emit('membersUpdated', membersWithScores);
-      },
+        callback({ success: true, roomCode: code, members, timeLeft: room.timeLeft });
+      }
     );
 
     socket.on('leaveRoom', (roomCode: string) => {
       const code = String(roomCode) as RoomCode;
       const room = getRoomEntry(code);
       if (!room) return;
+
       removeUserFromRoom(code, socket.id);
       socket.leave(code);
+
+      delete memberScores[code]?.[userId];
+
       socket.to(code).emit('userLeft', { username: displayName(user) });
+      socket.to(code).emit('membersUpdated', Object.values(memberScores[code] || {}));
     });
 
     socket.on('updateScore', (roomCode: string, score: number) => {
@@ -106,22 +113,20 @@ export function registerSocketHandlers(io: Server) {
       const room = getRoomEntry(code);
       if (!room) return;
 
-      memberScores[socket.id] = { username: displayName(user), score };
+      if (!memberScores[code]) memberScores[code] = {};
+      memberScores[code][userId] = { username: displayName(user), score };
 
-      const membersWithScores = Object.values(memberScores).map(member => ({
-        username: member.username,
-        score: member.score,
-      }));
-
-      io.to(code).emit('membersUpdated', membersWithScores);
+      io.to(code).emit('membersUpdated', Object.values(memberScores[code]));
     });
 
     socket.on('disconnect', () => {
       for (const [code] of (io as any).adapter.rooms || []) {
-        const entry = getRoomEntry(code as RoomCode);
-        if (entry && entry.users.has(socket.id)) {
+        const roomEntry = getRoomEntry(code as RoomCode);
+        if (roomEntry && roomEntry.users.has(socket.id)) {
           removeUserFromRoom(code as RoomCode, socket.id);
+          delete memberScores[code as RoomCode]?.[userId];
           socket.to(code).emit('userLeft', { username: displayName(user) });
+          socket.to(code).emit('membersUpdated', Object.values(memberScores[code as RoomCode] || {}));
         }
       }
     });
