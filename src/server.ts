@@ -12,6 +12,7 @@ import friendRoute from './routes/friends';
 import logoutRoute from './routes/logout';
 import roomsRoute from './routes/room';
 import triviaRoute from './routes/trivia';
+import statsRoute from './routes/stats';
 import { registerSocketHandlers } from './realtime/socket';
 
 const app = express();
@@ -41,6 +42,7 @@ app.use(friendRoute);
 app.use(logoutRoute);
 app.use(roomsRoute);
 app.use(triviaRoute);
+app.use(statsRoute);
 
 const io = new Server(server, {
   cors: {
