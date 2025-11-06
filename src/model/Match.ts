@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-//
+
 type Player = {
   userId: string;
   username: string;
