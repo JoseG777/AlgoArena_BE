@@ -11,8 +11,6 @@ import {
 } from './roomsStore';
 import { initMember, upsertScore, removeMember, getRoomScores } from './scoreStore';
 
-// const memberScores: Record<RoomCode, Record<string, { username: string; score: number }>> = {};
-
 function displayName(user: AccessClaims) {
   return user.username ?? user.email ?? `user:${user.sub.slice(-6)}`;
 }
