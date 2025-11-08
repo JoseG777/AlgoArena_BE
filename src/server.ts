@@ -13,6 +13,7 @@ import logoutRoute from './routes/logout';
 import { registerSocketHandlers } from './realtime/socket';
 
 
+
 const app = express();
 const server = http.createServer(app);
 app.use(express.json());
@@ -38,6 +39,7 @@ app.use(meRoute);
 app.use(judge0Route);
 app.use("/api",friendRoute);
 app.use(logoutRoute);
+
 
 const io = new Server(server, {
   cors: {
