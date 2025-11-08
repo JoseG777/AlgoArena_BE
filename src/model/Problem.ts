@@ -5,6 +5,7 @@ type Difficulty = 'easy' | 'medium' | 'hard';
 
 interface IProblem {
   problemId: string;
+  problemDescription: string;
   title: string;
   difficulty: Difficulty;
 
@@ -32,6 +33,7 @@ const ProblemSchema = new Schema<IProblem>(
     },
     startingCode: { type: LangBlockSchema, required: true },
     testHarness: { type: LangBlockSchema, required: true },
+    problemDescription: { type: String, required: true },
   },
   {
     collection: 'problems',

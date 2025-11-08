@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { getRoomScores, clearRoomScores } from './scoreStore';
-import { Match } from '../model/Match'; 
+import { Match } from '../model/Match';
 import { User } from '../model/User';
 import type { Server } from 'socket.io';
 
@@ -39,9 +39,7 @@ async function finalizeMatch(code: RoomCode) {
 
   const endedAt = new Date();
   const players = getRoomScores(code);
-  const isTie = players.length >= 2
-    ? players[0].score === players[1].score
-    : true;
+  const isTie = players.length >= 2 ? players[0].score === players[1].score : true;
 
   let winnerUserId: string | null = null;
   if (!isTie && players.length >= 2) {
@@ -92,16 +90,15 @@ export function createRoomEntry(opts: {
     code = nanoid(12);
   } while (rooms[code]);
 
-  const allowValues = [
-    (opts.ownerUsername || '').trim(),
-    (opts.allowUsername || '').trim(),
-  ]
+  const allowValues = [(opts.ownerUsername || '').trim(), (opts.allowUsername || '').trim()]
     .filter(Boolean)
-    .map((s) => s.toLowerCase());
+    .map(s => s.toLowerCase());
 
   const room: RoomEntry = {
     users: new Set<string>(),
-    allow: allowValues.length ? { type: 'username', values: Array.from(new Set(allowValues)) } : null,
+    allow: allowValues.length
+      ? { type: 'username', values: Array.from(new Set(allowValues)) }
+      : null,
     problemId: opts.problemId,
     durationSec: duration,
     expiresAt,
@@ -142,7 +139,7 @@ export function startRoomTimer(code: RoomCode) {
     }
 
     if (r.timeLeft <= 0) {
-      void finalizeMatch(code).catch((e) => console.error('finalizeMatch error:', e));
+      void finalizeMatch(code).catch(e => console.error('finalizeMatch error:', e));
       if (ioRef) {
         ioRef.to(code).emit('roomClosed');
 

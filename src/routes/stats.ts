@@ -15,7 +15,7 @@ statsRoute.get('/me/matches', requireAuth, async (req, res) => {
 
     const rows = await Match.find(
       { 'players.userId': myId },
-      { code: 1, startedAt: 1, players: 1, winnerUserId: 1, isTie: 1 }
+      { code: 1, startedAt: 1, players: 1, winnerUserId: 1, isTie: 1 },
     )
       .sort({ startedAt: -1 })
       .limit(100)
@@ -29,7 +29,7 @@ statsRoute.get('/me/matches', requireAuth, async (req, res) => {
 
     const opponents = await User.find(
       { _id: { $in: Array.from(opponentIds) } },
-      { username: 1 }
+      { username: 1 },
     ).lean();
     const unameById = new Map(opponents.map(u => [String(u._id), u.username]));
 
@@ -38,7 +38,7 @@ statsRoute.get('/me/matches', requireAuth, async (req, res) => {
       const oppPlayer = m.players.find(p => String(p.userId) !== myId);
       const points = Number(mePlayer?.score || 0);
 
-      let result: 'win'|'loss'|'tie' = 'tie';
+      let result: 'win' | 'loss' | 'tie' = 'tie';
       if (!m.isTie) {
         result = String(m.winnerUserId) === myId ? 'win' : 'loss';
       }
@@ -46,7 +46,7 @@ statsRoute.get('/me/matches', requireAuth, async (req, res) => {
       return {
         id: String(m._id),
         startedAt: new Date(m.startedAt).toISOString(),
-        opponentUsername: oppPlayer ? (unameById.get(String(oppPlayer.userId)) || '(unknown)') : null,
+        opponentUsername: oppPlayer ? unameById.get(String(oppPlayer.userId)) || '(unknown)' : null,
         points,
         result,
       };

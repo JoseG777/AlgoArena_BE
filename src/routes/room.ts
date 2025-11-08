@@ -23,19 +23,19 @@ roomsRoute.post('/rooms', requireAuth, async (req, res) => {
     };
 
     const { user } = req as AuthenticatedRequest;
-    const ownerUsername = (user as any)?.username || null; 
+    const ownerUsername = (user as any)?.username || null;
 
     const pipeline: any[] = [];
     if (difficulty) pipeline.push({ $match: { difficulty } });
     pipeline.push({ $sample: { size: 1 } });
-    pipeline.push({ $project: { _id: 0, problemId: 1, title: 1, difficulty: 1 } });
+    pipeline.push({ $project: { _id: 0, problemId: 1, title: 1, difficulty: 1, problemDescription: 1} });
 
     const picked = await Problem.aggregate(pipeline);
     if (!picked?.length) {
       return res.status(404).json({ error: 'No problems available for the given criteria' });
     }
 
-    const problem = picked[0] as { problemId: string; title: string; difficulty: string };
+    const problem = picked[0] as { problemId: string; title: string; difficulty: string; problemDescription: string; };
 
     const { code, room } = createRoomEntry({
       problemId: problem.problemId,
@@ -66,7 +66,7 @@ roomsRoute.get('/rooms/:code', requireAuth, async (req, res) => {
 
     const problemDoc = await Problem.findOne(
       { problemId: room.problemId },
-      { _id: 0, problemId: 1, title: 1, difficulty: 1, startingCode: 1 },
+      { _id: 0, problemId: 1, title: 1, difficulty: 1, startingCode: 1, problemDescription: 1 },
     ).lean();
 
     if (!problemDoc) {

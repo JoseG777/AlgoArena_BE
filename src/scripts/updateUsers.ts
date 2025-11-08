@@ -6,10 +6,7 @@ async function run() {
 
   const result = await User.updateMany(
     {
-      $or: [
-        { stats: { $exists: false } },
-        { 'stats.totalPoints': { $exists: false } },
-      ],
+      $or: [{ stats: { $exists: false } }, { 'stats.totalPoints': { $exists: false } }],
     },
     {
       $set: {
@@ -25,7 +22,7 @@ async function run() {
   console.log(`Updated ${result.modifiedCount} users.`);
 }
 
-run().catch((err) => {
+run().catch(err => {
   console.error(err);
   process.exit(1);
 });
