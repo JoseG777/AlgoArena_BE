@@ -16,11 +16,36 @@ export interface RoomEntry {
   createdAt: Date;
 }
 
+const onlineUsers: Record<string, Set<string>> = Object.create(null);
+
 const ROOM_TICK_MS = 1000;
 
 const rooms: Record<RoomCode, RoomEntry> = Object.create(null);
 
 let ioRef: Server | null = null;
+
+export function addOnlineUser(username: string, socketId: string) {
+  const uname = username.toLowerCase();
+  if (!onlineUsers[uname]) {
+    onlineUsers[uname] = new Set();
+  }
+  onlineUsers[uname].add(socketId);
+}
+
+export function removeOnlineUser(socketId: string) {
+  for (const uname in onlineUsers) {
+    if (onlineUsers[uname].delete(socketId)) {
+      if (onlineUsers[uname].size === 0) {
+        delete onlineUsers[uname];
+      }
+      return;
+    }
+  }
+}
+
+export function getOnlineSockets(username: string): Set<string> | undefined {
+  return onlineUsers[username.toLowerCase()];
+}
 
 export function attachIo(io: Server) {
   ioRef = io;
@@ -151,5 +176,7 @@ function clampDuration(n?: number, min = 15, max = 3600, def = 180): number {
   if (typeof n !== 'number' || !Number.isFinite(n)) return def;
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
+
+export function getIo(): Server | null { return ioRef; }
 
 export const __roomsDebug = rooms;

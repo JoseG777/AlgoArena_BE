@@ -6,6 +6,8 @@ import {
   getRoomEntry,
   addUserToRoom,
   removeUserFromRoom,
+  addOnlineUser,
+  removeOnlineUser,
   type RoomCode,
   type AllowRule,
 } from './roomsStore';
@@ -50,6 +52,11 @@ export function registerSocketHandlers(io: Server) {
   io.on('connection', (socket: Socket) => {
     const { user } = socket.data as { user: AccessClaims };
     const userId = getUserId(user);
+    const username = (user.username || '').toLowerCase();
+
+    if (username) {
+      addOnlineUser(username, socket.id);
+    }
 
     socket.on(
       'joinRoom',
@@ -129,6 +136,7 @@ export function registerSocketHandlers(io: Server) {
           socket.to(code).emit('membersUpdated', Object.values(memberScores[code as RoomCode] || {}));
         }
       }
+      removeOnlineUser(socket.id);
     });
   });
 }

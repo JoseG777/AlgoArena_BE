@@ -5,8 +5,10 @@ import {
   createRoomEntry,
   getRoomEntry,
   computeTimeLeft,
+  getOnlineSockets,
   type RoomCode,
 } from '../realtime/roomsStore';
+import { getIo } from '../realtime/roomsStore';
 
 const roomsRoute = Router();
 
@@ -23,7 +25,8 @@ roomsRoute.post('/rooms', requireAuth, async (req, res) => {
     };
 
     const { user } = req as AuthenticatedRequest;
-    const ownerUsername = (user as any)?.username || null; 
+    const ownerUsername = (user as any)?.username || null;
+    const inviterUsername = ownerUsername; 
 
     const pipeline: any[] = [];
     if (difficulty) pipeline.push({ $match: { difficulty } });
@@ -43,6 +46,21 @@ roomsRoute.post('/rooms', requireAuth, async (req, res) => {
       durationSec,
       ownerUsername,
     });
+
+    if (allowUsername) {
+        const invitedUname = allowUsername.toLowerCase();
+        const invitedSockets = getOnlineSockets(invitedUname);
+        
+        if (invitedSockets && invitedSockets.size > 0) {
+            const io = getIo();
+            if (io) {
+                io.to(Array.from(invitedSockets)).emit('friendInvited', {
+                    roomCode: code,
+                    inviterUsername: inviterUsername,
+                });
+            }
+        }
+    }
 
     return res.status(201).json({
       code,
