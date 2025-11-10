@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ITriviaProblem extends Document {
   question: string;
@@ -11,11 +11,11 @@ export interface ITriviaProblem extends Document {
 
 const triviaProblemSchema = new Schema<ITriviaProblem>({
   question: { type: String, required: true },
-  category: { type: String, default: "Computer Science" },
-  type: { type: String, default: "multiple" },
-  difficulty: { type: String, default: "medium" },
+  category: { type: String, default: 'Computer Science' },
+  type: { type: String, default: 'multiple' },
+  difficulty: { type: String, default: 'medium' },
   correct_answer: { type: String, required: true },
   incorrect_answers: { type: [String], required: true },
 });
 
-export default mongoose.model<ITriviaProblem>("TriviaProblem", triviaProblemSchema);
+export default mongoose.model<ITriviaProblem>('TriviaProblem', triviaProblemSchema);

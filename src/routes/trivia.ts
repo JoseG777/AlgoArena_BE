@@ -1,24 +1,26 @@
-import express from "express";
-import TriviaProblem from "../model/triviaProblem.js"; // adjust the path if needed
+import express from 'express';
+import TriviaProblem from '../model/triviaProblem.js';
 
 const router = express.Router();
 
-// GET /api/trivia
-router.get("/", async (req, res) => {
+router.get('/trivia', async (req, res) => {
   try {
     const { category } = req.query;
     const filter = category ? { category } : {};
 
-    const questions = await TriviaProblem.find(filter).limit(10);
+    const questions = await TriviaProblem.aggregate([
+      { $match: filter },
+      { $sample: { size: 10 } },
+    ]);
 
     if (questions.length === 0) {
-      return res.status(404).json({ success: false, message: "No trivia questions found." });
+      return res.status(404).json({ success: false, message: 'No trivia questions found.' });
     }
 
     res.json({ success: true, data: questions });
   } catch (error) {
-    console.error("❌ Error fetching trivia questions:", error);
-    res.status(500).json({ success: false, error: "Something went wrong" });
+    console.error('Error fetching trivia questions:', error);
+    res.status(500).json({ success: false, error: 'Something went wrong' });
   }
 });
 

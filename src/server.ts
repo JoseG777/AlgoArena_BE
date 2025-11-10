@@ -11,7 +11,7 @@ import judge0Route from './routes/judge0';
 import friendRoute from './routes/friends';
 import logoutRoute from './routes/logout';
 import { registerSocketHandlers } from './realtime/socket';
-import triviaRoutes from "./routes/trivia"; // ✅ your trivia route import
+import triviaRoutes from './routes/trivia';
 
 const app = express();
 const server = http.createServer(app);
@@ -33,14 +33,13 @@ app.get('/', (_req, res) => {
   res.send('Hello, Algo Arena Backend!');
 });
 
-// ✅ All routes
 app.use(registerRoute);
 app.use(loginRoute);
 app.use(meRoute);
 app.use(judge0Route);
 app.use(friendRoute);
 app.use(logoutRoute);
-app.use("/api/trivia", triviaRoutes); // 👈 Fixed here
+app.use(triviaRoutes);
 
 const io = new Server(server, {
   cors: {
