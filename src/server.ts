@@ -20,6 +20,7 @@ const server = http.createServer(app);
 app.use(express.json());
 app.use(cookieParser());
 const port = 3001;
+
 app.use(
   cors({
     origin: 'http://localhost:5173',
