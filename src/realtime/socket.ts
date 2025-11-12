@@ -8,6 +8,7 @@ import {
   removeUserFromRoom,
   addOnlineUser,
   removeOnlineUser,
+  tryStartRoom,
   type RoomCode,
   type AllowRule,
 } from './roomsStore';
@@ -66,7 +67,8 @@ export function registerSocketHandlers(io: Server) {
           roomCode?: string;
           error?: string;
           members?: string[];
-          timeLeft?: number;
+          timeLeft?: number | null;
+          started?: boolean;
         }) => void,
       ) => {
         const code = String(roomCode) as RoomCode;
@@ -90,8 +92,18 @@ export function registerSocketHandlers(io: Server) {
         }
 
         socket.to(code).emit('userJoined', { username: displayName(user) });
-        io.to(code).emit('membersUpdated', getRoomScores(code)); // broadcast current snapshot
-        callback({ success: true, roomCode: code, members, timeLeft: room.timeLeft });
+        io.to(code).emit('membersUpdated', getRoomScores(code));
+
+        tryStartRoom(code);
+        const after = getRoomEntry(code)!;
+
+        callback({
+          success: true,
+          roomCode: code,
+          members,
+          timeLeft: after.started ? after.timeLeft : null,
+          started: after.started,
+        });
       },
     );
 

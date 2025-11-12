@@ -26,19 +26,26 @@ roomsRoute.post('/rooms', requireAuth, async (req, res) => {
 
     const { user } = req as AuthenticatedRequest;
     const ownerUsername = (user as any)?.username || null;
-    const inviterUsername = ownerUsername; 
+    const inviterUsername = ownerUsername;
 
     const pipeline: any[] = [];
     if (difficulty) pipeline.push({ $match: { difficulty } });
     pipeline.push({ $sample: { size: 1 } });
-    pipeline.push({ $project: { _id: 0, problemId: 1, title: 1, difficulty: 1, problemDescription: 1} });
+    pipeline.push({
+      $project: { _id: 0, problemId: 1, title: 1, difficulty: 1, problemDescription: 1 },
+    });
 
     const picked = await Problem.aggregate(pipeline);
     if (!picked?.length) {
       return res.status(404).json({ error: 'No problems available for the given criteria' });
     }
 
-    const problem = picked[0] as { problemId: string; title: string; difficulty: string; problemDescription: string; };
+    const problem = picked[0] as {
+      problemId: string;
+      title: string;
+      difficulty: string;
+      problemDescription: string;
+    };
 
     const { code, room } = createRoomEntry({
       problemId: problem.problemId,
@@ -48,18 +55,18 @@ roomsRoute.post('/rooms', requireAuth, async (req, res) => {
     });
 
     if (allowUsername) {
-        const invitedUname = allowUsername.toLowerCase();
-        const invitedSockets = getOnlineSockets(invitedUname);
-        
-        if (invitedSockets && invitedSockets.size > 0) {
-            const io = getIo();
-            if (io) {
-                io.to(Array.from(invitedSockets)).emit('friendInvited', {
-                    roomCode: code,
-                    inviterUsername: inviterUsername,
-                });
-            }
+      const invitedUname = allowUsername.toLowerCase();
+      const invitedSockets = getOnlineSockets(invitedUname);
+
+      if (invitedSockets && invitedSockets.size > 0) {
+        const io = getIo();
+        if (io) {
+          io.to(Array.from(invitedSockets)).emit('friendInvited', {
+            roomCode: code,
+            inviterUsername: inviterUsername,
+          });
         }
+      }
     }
 
     return res.status(201).json({
@@ -67,6 +74,7 @@ roomsRoute.post('/rooms', requireAuth, async (req, res) => {
       problem,
       timeLeft: room.timeLeft,
       expiresAt: room.expiresAt.toISOString(),
+      started: room.started,
     });
   } catch (err) {
     console.error(err);
@@ -91,12 +99,13 @@ roomsRoute.get('/rooms/:code', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Problem not found' });
     }
 
-    const timeLeft = computeTimeLeft(room.expiresAt);
+    const timeLeft = room.started ? computeTimeLeft(room.expiresAt) : null;
 
     return res.status(200).json({
       code,
       problem: problemDoc,
       timeLeft,
+      started: room.started,
       expiresAt: room.expiresAt.toISOString(),
     });
   } catch (err) {

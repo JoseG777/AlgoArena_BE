@@ -17,6 +17,7 @@ export interface RoomEntry {
   timeLeft: number;
   timer?: NodeJS.Timeout | null;
   createdAt: Date;
+  started: boolean;
 }
 
 const onlineUsers: Record<string, Set<string>> = Object.create(null);
@@ -108,7 +109,6 @@ export function createRoomEntry(opts: {
   ownerUsername?: string | null;
 }): { code: RoomCode; room: RoomEntry } {
   const duration = clampDuration(opts.durationSec);
-  const expiresAt = new Date(Date.now() + duration * 1000);
 
   let code: string;
   do {
@@ -126,14 +126,14 @@ export function createRoomEntry(opts: {
       : null,
     problemId: opts.problemId,
     durationSec: duration,
-    expiresAt,
+    expiresAt: new Date(Date.now()),
     timeLeft: duration,
     timer: null,
     createdAt: new Date(),
+    started: false,
   };
 
   rooms[code] = room;
-  startRoomTimer(code);
 
   return { code, room };
 }
@@ -181,6 +181,44 @@ export function startRoomTimer(code: RoomCode) {
   }, ROOM_TICK_MS);
 }
 
+export function tryStartRoom(code: RoomCode) {
+  const room = rooms[code];
+  if (!room || room.started) return;
+
+  const required = room.allow?.values ?? [];
+
+  let haveAll = false;
+
+  if (required.length >= 2) {
+    const present = new Set<string>();
+    if (ioRef) {
+      for (const sid of room.users) {
+        const s = ioRef.sockets.sockets.get(sid);
+        const uname = (s?.data?.user?.username || '').toLowerCase();
+        if (uname) present.add(uname);
+      }
+    }
+    haveAll = required.every(u => present.has(u));
+  } else {
+    haveAll = room.users.size >= 2;
+  }
+
+  if (!haveAll) return;
+
+  room.started = true;
+  room.expiresAt = new Date(Date.now() + room.durationSec * 1000);
+  room.timeLeft = computeTimeLeft(room.expiresAt);
+
+  if (ioRef) {
+    ioRef.to(code).emit('battleStarted', {
+      timeLeft: room.timeLeft,
+      expiresAt: room.expiresAt.toISOString(),
+    });
+  }
+
+  startRoomTimer(code);
+}
+
 export function getRoomEntry(code: RoomCode): RoomEntry | undefined {
   return rooms[code];
 }
@@ -226,5 +264,3 @@ function clampDuration(n?: number, min = 15, max = 3600, def = 180): number {
 export function getIo(): Server | null { return ioRef; }
 
 export const __roomsDebug = rooms;
-
-//
