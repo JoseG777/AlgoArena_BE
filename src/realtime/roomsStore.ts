@@ -249,11 +249,7 @@ export function addUserToRoom(code: RoomCode, socketId: string) {
 export function removeUserFromRoom(code: RoomCode, socketId: string) {
   const room = rooms[code];
   if (!room) return;
-  if (room.users.delete(socketId)) {
-    if (room.users.size === 0) {
-      deleteRoomEntry(code);
-    }
-  }
+  room.users.delete(socketId);
 }
 
 function clampDuration(n?: number, min = 15, max = 3600, def = 180): number {
@@ -264,3 +260,21 @@ function clampDuration(n?: number, min = 15, max = 3600, def = 180): number {
 export function getIo(): Server | null { return ioRef; }
 
 export const __roomsDebug = rooms;
+
+export async function finalizeEarlyIfAllFinished(code: RoomCode) {
+  const room = rooms[code];
+  if (!room) return;
+
+  await finalizeMatch(code).catch(e => console.error('finalizeMatch error:', e));
+
+  if (ioRef) {
+    ioRef.to(code).emit('roomClosed');
+    for (const sid of room.users) {
+      const s = ioRef.sockets.sockets.get(sid);
+      s?.leave(code);
+    }
+  }
+
+  if (room.timer) clearInterval(room.timer);
+  delete rooms[code];
+}

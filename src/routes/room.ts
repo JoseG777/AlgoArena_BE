@@ -9,6 +9,7 @@ import {
   type RoomCode,
 } from '../realtime/roomsStore';
 import { getIo } from '../realtime/roomsStore';
+import { getRoomScores } from '../realtime/scoreStore';
 
 const roomsRoute = Router();
 
@@ -101,12 +102,19 @@ roomsRoute.get('/rooms/:code', requireAuth, async (req, res) => {
 
     const timeLeft = room.started ? computeTimeLeft(room.expiresAt) : null;
 
+    const members = getRoomScores(code).map(m => ({
+      username: m.username,
+      score: m.score,
+      finished: m.finished,
+    }));
+
     return res.status(200).json({
       code,
       problem: problemDoc,
       timeLeft,
       started: room.started,
       expiresAt: room.expiresAt.toISOString(),
+      members,
     });
   } catch (err) {
     console.error(err);

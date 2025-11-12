@@ -6,13 +6,13 @@ import {
   getRoomEntry,
   addUserToRoom,
   removeUserFromRoom,
-  addOnlineUser,
-  removeOnlineUser,
   tryStartRoom,
+  __roomsDebug,
   type RoomCode,
   type AllowRule,
 } from './roomsStore';
-import { initMember, upsertScore, removeMember, getRoomScores } from './scoreStore';
+import { initMember, upsertScore, markFinished, getRoomScores, allFinished } from './scoreStore';
+import { finalizeEarlyIfAllFinished } from './roomsStore';
 
 function displayName(user: AccessClaims) {
   return user.username ?? user.email ?? `user:${user.sub.slice(-6)}`;
@@ -30,6 +30,14 @@ function isAllowed(user: AccessClaims, rule?: AllowRule | null): boolean {
     return rule.values.includes(uname);
   }
   return false;
+}
+
+function publicMembersPayload(code: RoomCode) {
+  return getRoomScores(code).map(m => ({
+    username: m.username,
+    score: m.score,
+    finished: m.finished,
+  }));
 }
 
 export function registerSocketHandlers(io: Server) {
@@ -84,15 +92,10 @@ export function registerSocketHandlers(io: Server) {
 
         initMember(code, userId, displayName(user));
 
-        const members: string[] = [];
-        for (const sid of room.users) {
-          const s = io.sockets.sockets.get(sid);
-          const u = s?.data?.user as AccessClaims | undefined;
-          if (u) members.push(displayName(u));
-        }
+        const membersUsernames = publicMembersPayload(code).map(m => m.username);
 
         socket.to(code).emit('userJoined', { username: displayName(user) });
-        io.to(code).emit('membersUpdated', getRoomScores(code));
+        io.to(code).emit('membersUpdated', publicMembersPayload(code));
 
         tryStartRoom(code);
         const after = getRoomEntry(code)!;
@@ -100,7 +103,7 @@ export function registerSocketHandlers(io: Server) {
         callback({
           success: true,
           roomCode: code,
-          members,
+          members: membersUsernames,
           timeLeft: after.started ? after.timeLeft : null,
           started: after.started,
         });
@@ -113,7 +116,20 @@ export function registerSocketHandlers(io: Server) {
       if (!room) return;
 
       upsertScore(code, userId, displayName(user), score);
-      io.to(code).emit('membersUpdated', getRoomScores(code));
+      io.to(code).emit('membersUpdated', publicMembersPayload(code));
+    });
+
+    socket.on('finish', (roomCode: string) => {
+      const code = String(roomCode) as RoomCode;
+      const room = getRoomEntry(code);
+      if (!room) return;
+
+      markFinished(code, userId, displayName(user));
+      io.to(code).emit('membersUpdated', publicMembersPayload(code));
+
+      if (allFinished(code)) {
+        void finalizeEarlyIfAllFinished(code);
+      }
     });
 
     socket.on('leaveRoom', (roomCode: string) => {
@@ -124,22 +140,22 @@ export function registerSocketHandlers(io: Server) {
       removeUserFromRoom(code, socket.id);
       socket.leave(code);
 
-      removeMember(code, userId);
       socket.to(code).emit('userLeft', { username: displayName(user) });
-      io.to(code).emit('membersUpdated', getRoomScores(code));
+      io.to(code).emit('membersUpdated', publicMembersPayload(code));
     });
 
     socket.on('disconnect', () => {
-      for (const [code] of (io as any).adapter.rooms || []) {
-        const entry = getRoomEntry(code as RoomCode);
-        if (entry && entry.users.has(socket.id)) {
+      // Presence-only cleanup; do not delete scoreboard entries on refresh
+      for (const [code, entry] of Object.entries(__roomsDebug)) {
+        if (entry.users.has(socket.id)) {
           removeUserFromRoom(code as RoomCode, socket.id);
-          removeMember(code as RoomCode, userId);
           socket.to(code).emit('userLeft', { username: displayName(user) });
-          io.to(code).emit('membersUpdated', getRoomScores(code as RoomCode));
+          io.to(code).emit('membersUpdated', publicMembersPayload(code as RoomCode));
         }
       }
       removeOnlineUser(socket.id);
     });
   });
 }
+
+import { addOnlineUser, removeOnlineUser } from './roomsStore';
