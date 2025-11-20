@@ -11,7 +11,7 @@ import judge0Route from './routes/judge0';
 import friendRoute from './routes/friends';
 import logoutRoute from './routes/logout';
 import roomsRoute from './routes/room';
-import triviaRoute from './routes/trivia';
+import triviaRoute from './routes/trivia.js';
 import statsRoute from './routes/stats';
 import { registerSocketHandlers } from './realtime/socket';
 

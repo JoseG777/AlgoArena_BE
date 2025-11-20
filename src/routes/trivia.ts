@@ -24,4 +24,23 @@ triviaRoute.get('/trivia', async (req, res) => {
   }
 });
 
+triviaRoute.post("/trivia-room", async (req, res) => {
+  try {
+    const { difficulty, durationSec } = req.body;
+
+    
+    const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    console.log(
+      `🎯 Trivia room created: ${roomCode} | Difficulty=${difficulty} | Duration=${durationSec}s`
+    );
+
+    
+    res.status(200).json({ code: roomCode });
+  } catch (error) {
+    console.error("Error creating trivia room:", error);
+    res.status(500).json({ error: "Failed to create trivia room" });
+  }
+});
+
 export default triviaRoute;
