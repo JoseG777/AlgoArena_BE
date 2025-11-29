@@ -19,11 +19,13 @@ const app = express();
 const server = http.createServer(app);
 app.use(express.json());
 app.use(cookieParser());
-const port = 3001;
+
+const FRONTEND_ORIGIN =
+  process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin: FRONTEND_ORIGIN,
     credentials: true,
   }),
 );
@@ -47,7 +49,7 @@ app.use(statsRoute);
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: FRONTEND_ORIGIN,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -55,6 +57,8 @@ const io = new Server(server, {
 
 registerSocketHandlers(io);
 
-server.listen(port, () => {
-  console.log(`Backend + Socket.IO running at http://localhost:${port}`);
+const PORT = process.env.PORT || 3001;
+
+server.listen(PORT, () => {
+  console.log(`Backend + Socket.IO running at http://localhost:${PORT}`);
 });

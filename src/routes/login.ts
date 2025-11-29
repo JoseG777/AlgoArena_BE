@@ -47,7 +47,7 @@ loginRoute.post('/login', async (req, res) => {
 
     res.cookie('access', token, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'none',
       secure: process.env.NODE_ENV !== 'development',
       path: '/',
       maxAge: 60 * 60 * 1000,
