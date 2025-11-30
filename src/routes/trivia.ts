@@ -6,7 +6,6 @@ import {
   getOnlineSockets,
   getIo,
   type RoomCode,
-  finalizeEarlyIfAllFinished,
 } from '../realtime/roomsStore';
 import {
   upsertScore,
@@ -14,6 +13,7 @@ import {
   getRoomScores,
   allFinished,
 } from '../realtime/scoreStore';
+import type { AccessClaims } from '../lib/jwt';
 
 const triviaRoute = Router();
 
@@ -265,6 +265,7 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
       result.correctCount = correctCount;
       result.totalQuestions = totalQuestions;
       result.baseScore = baseScore;
+      result.finishedAt = new Date();
     }
 
     upsertScore(code, userId, username, baseScore);
@@ -279,9 +280,6 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
 
     if (!everyoneFinished) {
       return res.status(200).json({
-        score: baseScore,
-        baseScore,
-        speedBonusApplied: false,
         allFinished: false,
       });
     }
@@ -302,25 +300,45 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
 
       upsertScore(code, winner.userId, winner.username, newWinnerScore);
 
-      if (io) {
-        io.to(code).emit('membersUpdated', publicMembersPayload(code));
-      }
-
       if (winner.userId === userId) {
         speedBonusAppliedForUser = true;
         baseScore = newWinnerScore;
       }
     }
 
-    await finalizeEarlyIfAllFinished(code);
+    if (io) {
+      const sockets = await io.in(code).fetchSockets();
+      const leaderboard = state.results.map(r => ({
+        userId: r.userId,
+        username: r.username,
+        score: r.baseScore,
+        correctCount: r.correctCount,
+        totalQuestions: r.totalQuestions,
+      }));
+
+      for (const s of sockets) {
+        const sUser = (s.data as { user?: AccessClaims }).user;
+        if (!sUser) continue;
+        const sid = String(sUser.sub);
+        const r = state.results.find(x => x.userId === sid);
+        if (!r) continue;
+
+        s.emit('triviaResults', {
+          roomCode: code,
+          yourScore: r.baseScore,
+          yourCorrectCount: r.correctCount,
+          yourTotalQuestions: r.totalQuestions,
+          leaderboard,
+        });
+      }
+    }
+
     delete triviaStateByRoom[code];
     delete triviaQuestionsByRoom[code];
 
     return res.status(200).json({
-      score: baseScore,
-      baseScore,
-      speedBonusApplied: speedBonusAppliedForUser,
       allFinished: true,
+      speedBonusApplied: speedBonusAppliedForUser,
     });
   } catch (error) {
     console.error('Error grading trivia submission:', error);
