@@ -13,6 +13,7 @@ import {
 } from './roomsStore';
 import { initMember, upsertScore, markFinished, getRoomScores, allFinished } from './scoreStore';
 import { finalizeEarlyIfAllFinished } from './roomsStore';
+import { addOnlineUser, removeOnlineUser } from './roomsStore';
 
 function displayName(user: AccessClaims) {
   return user.username ?? user.email ?? `user:${user.sub.slice(-6)}`;
@@ -39,6 +40,8 @@ function publicMembersPayload(code: RoomCode) {
     finished: m.finished,
   }));
 }
+
+const triviaDoneByRoom: Record<RoomCode, Set<string>> = Object.create(null);
 
 export function registerSocketHandlers(io: Server) {
   attachIo(io);
@@ -132,6 +135,25 @@ export function registerSocketHandlers(io: Server) {
       }
     });
 
+    socket.on('triviaDone', (roomCode: string) => {
+      const code = String(roomCode) as RoomCode;
+      const room = getRoomEntry(code);
+      if (!room) return;
+
+      if (!triviaDoneByRoom[code]) triviaDoneByRoom[code] = new Set();
+      triviaDoneByRoom[code].add(userId);
+
+      const scores = getRoomScores(code);
+      const userIds = new Set(scores.map(s => s.userId));
+      const allDone =
+        userIds.size > 0 && Array.from(userIds).every(id => triviaDoneByRoom[code].has(id));
+
+      if (allDone) {
+        void finalizeEarlyIfAllFinished(code);
+        delete triviaDoneByRoom[code];
+      }
+    });
+
     socket.on('leaveRoom', (roomCode: string) => {
       const code = String(roomCode) as RoomCode;
       const room = getRoomEntry(code);
@@ -145,7 +167,6 @@ export function registerSocketHandlers(io: Server) {
     });
 
     socket.on('disconnect', () => {
-      // Presence-only cleanup; do not delete scoreboard entries on refresh
       for (const [code, entry] of Object.entries(__roomsDebug)) {
         if (entry.users.has(socket.id)) {
           removeUserFromRoom(code as RoomCode, socket.id);
@@ -157,5 +178,3 @@ export function registerSocketHandlers(io: Server) {
     });
   });
 }
-
-import { addOnlineUser, removeOnlineUser } from './roomsStore';
