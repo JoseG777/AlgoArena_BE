@@ -16,8 +16,6 @@ import statsRoute from './routes/stats';
 import { registerSocketHandlers } from './realtime/socket';
 import leaderboardRoute from "./routes/leaderboard";
 
-
-
 const app = express();
 const server = http.createServer(app);
 app.use(express.json());
