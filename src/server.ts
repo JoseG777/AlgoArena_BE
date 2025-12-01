@@ -14,6 +14,7 @@ import roomsRoute from './routes/room';
 import triviaRoute from './routes/trivia';
 import statsRoute from './routes/stats';
 import { registerSocketHandlers } from './realtime/socket';
+import leaderboardRoute from "./routes/leaderboard";
 
 const app = express();
 const server = http.createServer(app);
@@ -46,6 +47,7 @@ app.use(logoutRoute);
 app.use(roomsRoute);
 app.use(triviaRoute);
 app.use(statsRoute);
+app.use(leaderboardRoute);
 
 const io = new Server(server, {
   cors: {
