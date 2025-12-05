@@ -65,11 +65,59 @@ async function finalizeMatch(code: RoomCode) {
 
   const endedAt = new Date();
   const players = getRoomScores(code);
-  const isTie = players.length >= 2 ? players[0].score === players[1].score : true;
+
+  if (room.problemId !== 'TRIVIA' && players.length > 0) {
+    const finishedPlayers = players.filter(p => p.finished && p.finishedAt);
+    if (finishedPlayers.length > 0) {
+      finishedPlayers.sort(
+        (a, b) => (a.finishedAt!.getTime() - b.finishedAt!.getTime()),
+      );
+      const firstFinisher = finishedPlayers[0];
+
+      const maxScore = Math.max(...players.map(p => p.score));
+      const topPlayers = players.filter(p => p.score === maxScore);
+
+      if (
+        topPlayers.length === 1 &&
+        topPlayers[0].userId === firstFinisher.userId
+      ) {
+        firstFinisher.score += 10;
+      }
+    }
+  }
+
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  const isTie = sorted.length >= 2 ? sorted[0].score === sorted[1].score : true;
 
   let winnerUserId: string | null = null;
-  if (!isTie && players.length >= 2) {
-    winnerUserId = players[0].score > players[1].score ? players[0].userId : players[1].userId;
+  if (!isTie && sorted.length >= 1) {
+    winnerUserId = sorted[0].userId;
+  }
+
+  if (ioRef && room.problemId !== 'TRIVIA') {
+    const sockets = await ioRef.in(code).fetchSockets();
+
+    const leaderboard = sorted.map(p => ({
+      username: p.username,
+      score: p.score,
+    }));
+
+    for (const s of sockets) {
+      const userData = (s.data as { user?: any }).user;
+      if (!userData) continue;
+      const sid = String(userData.sub);
+      const yourEntry = players.find(p => p.userId === sid);
+      const yourScore = yourEntry?.score ?? 0;
+      const youWon = !isTie && winnerUserId === sid;
+
+      s.emit('codingResults', {
+        roomCode: code,
+        yourScore,
+        leaderboard,
+        isTie,
+        youWon,
+      });
+    }
   }
 
   await Match.create({
@@ -164,19 +212,23 @@ export function startRoomTimer(code: RoomCode) {
     }
 
     if (r.timeLeft <= 0) {
+      if (r.timer) {
+        clearInterval(r.timer);
+        r.timer = null;
+      }
+
       void finalizeMatch(code).catch(e => console.error('finalizeMatch error:', e));
-      if (ioRef) {
+
+      if (ioRef && r.problemId === 'TRIVIA') {
         ioRef.to(code).emit('roomClosed');
 
         for (const sid of r.users) {
           const s = ioRef.sockets.sockets.get(sid);
           s?.leave(code);
         }
-      }
 
-      clearInterval(r.timer!);
-      r.timer = null;
-      delete rooms[code];
+        delete rooms[code];
+      }
     }
   }, ROOM_TICK_MS);
 }
@@ -257,7 +309,9 @@ function clampDuration(n?: number, min = 15, max = 3600, def = 180): number {
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
-export function getIo(): Server | null { return ioRef; }
+export function getIo(): Server | null {
+  return ioRef;
+}
 
 export const __roomsDebug = rooms;
 
@@ -267,14 +321,17 @@ export async function finalizeEarlyIfAllFinished(code: RoomCode) {
 
   await finalizeMatch(code).catch(e => console.error('finalizeMatch error:', e));
 
-  if (ioRef) {
+  if (room.timer) {
+    clearInterval(room.timer);
+    room.timer = null;
+  }
+
+  if (ioRef && room.problemId === 'TRIVIA') {
     ioRef.to(code).emit('roomClosed');
     for (const sid of room.users) {
       const s = ioRef.sockets.sockets.get(sid);
       s?.leave(code);
     }
+    delete rooms[code];
   }
-
-  if (room.timer) clearInterval(room.timer);
-  delete rooms[code];
 }

@@ -1,6 +1,12 @@
 import type { RoomCode } from './roomsStore';
 
-export type MemberScore = { userId: string; username: string; score: number; finished: boolean };
+export type MemberScore = {
+  userId: string;
+  username: string;
+  score: number;
+  finished: boolean;
+  finishedAt: Date | null;
+};
 
 const scoresByRoom: Record<RoomCode, Record<string, MemberScore>> = Object.create(null);
 
@@ -12,13 +18,20 @@ export function upsertScore(room: RoomCode, userId: string, username: string, sc
     username,
     score,
     finished: prev?.finished ?? false,
+    finishedAt: prev?.finishedAt ?? null,
   };
 }
 
 export function initMember(room: RoomCode, userId: string, username: string) {
   if (!scoresByRoom[room]) scoresByRoom[room] = {};
   if (!scoresByRoom[room][userId]) {
-    scoresByRoom[room][userId] = { userId, username, score: 0, finished: false };
+    scoresByRoom[room][userId] = {
+      userId,
+      username,
+      score: 0,
+      finished: false,
+      finishedAt: null,
+    };
   }
 }
 
@@ -28,8 +41,15 @@ export function markFinished(room: RoomCode, userId: string, username: string) {
   if (prev) {
     prev.finished = true;
     if (!prev.username) prev.username = username;
+    if (!prev.finishedAt) prev.finishedAt = new Date();
   } else {
-    scoresByRoom[room][userId] = { userId, username, score: 0, finished: true };
+    scoresByRoom[room][userId] = {
+      userId,
+      username,
+      score: 0,
+      finished: true,
+      finishedAt: new Date(),
+    };
   }
 }
 

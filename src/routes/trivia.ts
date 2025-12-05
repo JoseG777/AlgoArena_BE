@@ -5,6 +5,7 @@ import {
   createRoomEntry,
   getOnlineSockets,
   getIo,
+  finalizeEarlyIfAllFinished,
   type RoomCode,
 } from '../realtime/roomsStore';
 import {
@@ -288,33 +289,47 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
 
     if (!state.speedBonusAwarded && state.results.length > 0) {
       const maxBaseScore = Math.max(...state.results.map(r => r.baseScore));
-      const topPlayers = state.results.filter(r => r.baseScore === maxBaseScore);
+      const topScorers = state.results.filter(r => r.baseScore === maxBaseScore);
 
-      topPlayers.sort((a, b) => a.finishedAt.getTime() - b.finishedAt.getTime());
+      if (topScorers.length === 1) {
+        const candidate = topScorers[0];
 
-      const winner = topPlayers[0];
-      state.speedBonusAwarded = true;
+        const earliest = [...state.results].sort(
+          (a, b) => a.finishedAt.getTime() - b.finishedAt.getTime(),
+        )[0];
 
-      const newWinnerScore = winner.baseScore + 10;
-      winner.baseScore = newWinnerScore;
+        if (earliest.userId === candidate.userId) {
+          state.speedBonusAwarded = true;
 
-      upsertScore(code, winner.userId, winner.username, newWinnerScore);
+          const newWinnerScore = candidate.baseScore + 10;
+          candidate.baseScore = newWinnerScore;
 
-      if (winner.userId === userId) {
-        speedBonusAppliedForUser = true;
-        baseScore = newWinnerScore;
+          upsertScore(code, candidate.userId, candidate.username, newWinnerScore);
+
+          if (candidate.userId === userId) {
+            speedBonusAppliedForUser = true;
+            baseScore = newWinnerScore;
+          }
+        }
       }
     }
 
     if (io) {
       const sockets = await io.in(code).fetchSockets();
-      const leaderboard = state.results.map(r => ({
-        userId: r.userId,
-        username: r.username,
-        score: r.baseScore,
-        correctCount: r.correctCount,
-        totalQuestions: r.totalQuestions,
-      }));
+
+      const leaderboard = [...state.results]
+        .sort((a, b) => b.baseScore - a.baseScore)
+        .map(r => ({
+          userId: r.userId,
+          username: r.username,
+          score: r.baseScore,
+          correctCount: r.correctCount,
+          totalQuestions: r.totalQuestions,
+        }));
+
+      const isTie =
+        leaderboard.length >= 2 && leaderboard[0].score === leaderboard[1].score;
+      const winnerUserId = !isTie && leaderboard.length > 0 ? leaderboard[0].userId : null;
 
       for (const s of sockets) {
         const sUser = (s.data as { user?: AccessClaims }).user;
@@ -323,15 +338,21 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
         const r = state.results.find(x => x.userId === sid);
         if (!r) continue;
 
+        const youWon = !isTie && winnerUserId === sid;
+
         s.emit('triviaResults', {
           roomCode: code,
           yourScore: r.baseScore,
           yourCorrectCount: r.correctCount,
           yourTotalQuestions: r.totalQuestions,
           leaderboard,
+          isTie,
+          youWon,
         });
       }
     }
+
+    await finalizeEarlyIfAllFinished(code);
 
     delete triviaStateByRoom[code];
     delete triviaQuestionsByRoom[code];
@@ -345,5 +366,6 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Failed to grade trivia submission' });
   }
 });
+
 
 export default triviaRoute;

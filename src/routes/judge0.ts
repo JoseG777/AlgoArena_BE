@@ -48,9 +48,13 @@ function memoryPenaltyKb(kb?: number | null) {
 
 function parsePassFail(stdout: string) {
   const lines = stdout.split(/\r?\n/).filter(Boolean);
-  let pass = 0,
-    fail = 0,
-    total = 0;
+  let pass = 0;
+  let fail = 0;
+  let total = 0;
+
+  let hiddenPass = 0;
+  let hiddenFail = 0;
+  let hiddenTotal = 0;
 
   for (const line of lines) {
     const m = line.match(/Case\s+\d+:\s+(PASS|FAIL)/i);
@@ -60,17 +64,25 @@ function parsePassFail(stdout: string) {
     const w = isHidden ? 2 : 1;
 
     total += w;
-    if (m[1].toUpperCase() === 'PASS') pass += w;
-    else fail += w;
+    const isPass = m[1].toUpperCase() === 'PASS';
+    if (isPass) {
+      pass += w;
+      if (isHidden) hiddenPass += 1;
+    } else {
+      fail += w;
+      if (isHidden) hiddenFail += 1;
+    }
+
+    if (isHidden) hiddenTotal += 1;
   }
 
-  return { pass, fail, total };
+  return { pass, fail, total, hiddenPass, hiddenFail, hiddenTotal };
 }
 
 function hideHiddenLines(stdout: string) {
   return stdout
     .split(/\r?\n/)
-    .filter((line) => line && !line.startsWith('HIDDEN '))
+    .filter(line => line && !line.startsWith('HIDDEN '))
     .join('\n');
 }
 
@@ -94,7 +106,10 @@ function gradeFromJudge0(judge0: any) {
     breakdown['runtimePenalty'] = WEIGHTS.RUNTIME;
   }
 
-  const { pass, fail, total } = parsePassFail(rawStdout);
+  const { pass, fail, total, hiddenPass, hiddenFail, hiddenTotal } = parsePassFail(rawStdout);
+  const hasHiddenCase = hiddenTotal > 0;
+  const hiddenCasePassed = hasHiddenCase && hiddenFail === 0;
+
   if (total > 0) {
     const sPass = pass * WEIGHTS.PER_PASS;
     const sFail = fail * WEIGHTS.PER_FAIL;
@@ -103,6 +118,8 @@ function gradeFromJudge0(judge0: any) {
     breakdown['fails'] = fail;
     breakdown['passPoints'] = sPass;
     breakdown['failPoints'] = sFail;
+    breakdown['hasHidden'] = hasHiddenCase ? 1 : 0;
+    breakdown['hiddenPassed'] = hiddenCasePassed ? 1 : 0;
   }
 
   if (stderr.trim()) {
@@ -135,6 +152,8 @@ function gradeFromJudge0(judge0: any) {
     isTimeout,
     passCount: pass,
     totalCount: total,
+    hasHiddenCase,
+    hiddenCasePassed,
   };
 }
 
@@ -216,8 +235,7 @@ judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
     const isCeLike = graded.isCompilationError || graded.isTimeout;
     const wasCeLike = state.lastWasCeOrTimeout;
     const isFirstSubmission = state.submissions === 0;
-    const allTestsPassed =
-      graded.totalCount > 0 && graded.passCount === graded.totalCount;
+    const allTestsPassed = graded.totalCount > 0 && graded.passCount === graded.totalCount;
 
     let ceDelta = 0;
     let runScore: number;
@@ -261,9 +279,11 @@ judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
       stdout: graded.stdout,
       stderr: graded.stderr,
       compile_output: graded.compile_output,
-      score: runScore,
+      score: runScore, 
       runScore,
       breakdown: graded.breakdown,
+      hasHiddenCase: graded.hasHiddenCase,
+      hiddenCasePassed: graded.hiddenCasePassed,
     });
   } catch (err) {
     console.error(err);
