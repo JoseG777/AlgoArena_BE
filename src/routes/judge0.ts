@@ -15,6 +15,21 @@ function b64enc(s: string) {
   return Buffer.from(s, 'utf8').toString('base64');
 }
 
+function wrapJava(userSrc: string, harness: string) {
+  return (
+    'import java.util.*;\n' +
+    '\n' +
+    userSrc.trim() +
+    '\n\n' +
+    'public class Main {\n' +
+    '  public static void main(String[] args) {\n' +
+    harness.trim() +
+    '\n' +
+    '  }\n' +
+    '}\n'
+  );
+}
+
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
@@ -170,10 +185,10 @@ judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
     source_code: string;
     stdin?: string;
     problemId: string;
-    lang: 'typescript' | 'python';
+    lang: 'typescript' | 'python' | 'java';
   };
 
-  if (!problemId || (lang !== 'typescript' && lang !== 'python')) {
+  if (!problemId || (lang !== 'typescript' && lang !== 'python' && lang !== 'java')) {
     return res.status(400).json({ error: 'Invalid problemId or lang' });
   }
 
@@ -193,7 +208,10 @@ judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
     const harness = (problem as any)?.testHarness?.[lang] || '';
 
     const userSrc = b64dec(source_code);
-    const fullSource = `${userSrc}\n\n${harness}`;
+    let fullSource = `${userSrc}\n\n${harness}`;
+    if (lang === 'java') {
+      fullSource = wrapJava(userSrc, harness);
+    }
     const fullSourceB64 = b64enc(fullSource);
 
     const apiRes = await fetch(
@@ -224,13 +242,12 @@ judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
 
     const cacheKey = `${userId}:${problemId}`;
     const current = cache.get<UserProblemState>(cacheKey);
-    const state: UserProblemState =
-      current ?? {
-        submissions: 0,
-        baseBest: GRADING_LIMITS.MIN,
-        cePenalty: 0,
-        lastWasCeOrTimeout: false,
-      };
+    const state: UserProblemState = current ?? {
+      submissions: 0,
+      baseBest: GRADING_LIMITS.MIN,
+      cePenalty: 0,
+      lastWasCeOrTimeout: false,
+    };
 
     const isCeLike = graded.isCompilationError || graded.isTimeout;
     const wasCeLike = state.lastWasCeOrTimeout;
@@ -279,7 +296,7 @@ judge0Route.post('/judge0/run', requireAuth, async (req, res) => {
       stdout: graded.stdout,
       stderr: graded.stderr,
       compile_output: graded.compile_output,
-      score: runScore, 
+      score: runScore,
       runScore,
       breakdown: graded.breakdown,
       hasHiddenCase: graded.hasHiddenCase,

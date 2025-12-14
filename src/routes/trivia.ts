@@ -8,12 +8,7 @@ import {
   finalizeEarlyIfAllFinished,
   type RoomCode,
 } from '../realtime/roomsStore';
-import {
-  upsertScore,
-  markFinished,
-  getRoomScores,
-  allFinished,
-} from '../realtime/scoreStore';
+import { upsertScore, markFinished, getRoomScores, allFinished } from '../realtime/scoreStore';
 import type { AccessClaims } from '../lib/jwt';
 
 const triviaRoute = Router();
@@ -53,9 +48,7 @@ function publicMembersPayload(code: RoomCode) {
 
 function normalizeTriviaDoc(q: any): TriviaQuestionPayload | null {
   const questionText =
-    typeof q.question === 'string' && q.question.trim().length > 0
-      ? q.question.trim()
-      : null;
+    typeof q.question === 'string' && q.question.trim().length > 0 ? q.question.trim() : null;
 
   if (!questionText) return null;
 
@@ -78,16 +71,12 @@ function normalizeTriviaDoc(q: any): TriviaQuestionPayload | null {
   if (!options.length) {
     const incorrectRaw = q.incorrectAnswers ?? q.incorrect_answers ?? [];
     const incorrectArr: string[] = Array.isArray(incorrectRaw)
-      ? incorrectRaw.filter(
-          (v: any): v is string => typeof v === 'string' && v.trim().length > 0,
-        )
+      ? incorrectRaw.filter((v: any): v is string => typeof v === 'string' && v.trim().length > 0)
       : [];
     options = [correct, ...incorrectArr];
   }
 
-  options = options
-    .map((v: any) => String(v).trim())
-    .filter((v: string) => v.length > 0);
+  options = options.map((v: any) => String(v).trim()).filter((v: string) => v.length > 0);
 
   if (!options.length) return null;
 
@@ -152,8 +141,7 @@ triviaRoute.post('/trivia-room', requireAuth, async (req, res) => {
     const durationSec = 180;
 
     const { user } = req as AuthenticatedRequest;
-    const ownerUsername =
-      ((user as any)?.username || (user as any)?.email || '').trim() || null;
+    const ownerUsername = ((user as any)?.username || (user as any)?.email || '').trim() || null;
     const inviterUsername = ownerUsername;
 
     const { code, room } = createRoomEntry({
@@ -163,10 +151,7 @@ triviaRoute.post('/trivia-room', requireAuth, async (req, res) => {
       ownerUsername,
     });
 
-    const questions = await TriviaProblem.aggregate([
-      { $match: {} },
-      { $sample: { size: 10 } },
-    ]);
+    const questions = await TriviaProblem.aggregate([{ $match: {} }, { $sample: { size: 10 } }]);
 
     if (questions.length === 0) {
       return res.status(404).json({ error: 'No trivia questions available' });
@@ -234,8 +219,7 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
     const { user } = req as AuthenticatedRequest;
     const userId = String(user.sub);
     const username =
-      ((user as any).username || (user as any).email || '').trim() ||
-      `user:${userId.slice(-6)}`;
+      ((user as any).username || (user as any).email || '').trim() || `user:${userId.slice(-6)}`;
 
     let baseScore = correctCount * 10;
     const allCorrect = correctCount === totalQuestions;
@@ -327,8 +311,7 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
           totalQuestions: r.totalQuestions,
         }));
 
-      const isTie =
-        leaderboard.length >= 2 && leaderboard[0].score === leaderboard[1].score;
+      const isTie = leaderboard.length >= 2 && leaderboard[0].score === leaderboard[1].score;
       const winnerUserId = !isTie && leaderboard.length > 0 ? leaderboard[0].userId : null;
 
       for (const s of sockets) {
@@ -366,6 +349,5 @@ triviaRoute.post('/trivia/submit', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Failed to grade trivia submission' });
   }
 });
-
 
 export default triviaRoute;

@@ -69,18 +69,13 @@ async function finalizeMatch(code: RoomCode) {
   if (room.problemId !== 'TRIVIA' && players.length > 0) {
     const finishedPlayers = players.filter(p => p.finished && p.finishedAt);
     if (finishedPlayers.length > 0) {
-      finishedPlayers.sort(
-        (a, b) => (a.finishedAt!.getTime() - b.finishedAt!.getTime()),
-      );
+      finishedPlayers.sort((a, b) => a.finishedAt!.getTime() - b.finishedAt!.getTime());
       const firstFinisher = finishedPlayers[0];
 
       const maxScore = Math.max(...players.map(p => p.score));
       const topPlayers = players.filter(p => p.score === maxScore);
 
-      if (
-        topPlayers.length === 1 &&
-        topPlayers[0].userId === firstFinisher.userId
-      ) {
+      if (topPlayers.length === 1 && topPlayers[0].userId === firstFinisher.userId) {
         firstFinisher.score += 10;
       }
     }

@@ -14,15 +14,14 @@ import roomsRoute from './routes/room';
 import triviaRoute from './routes/trivia';
 import statsRoute from './routes/stats';
 import { registerSocketHandlers } from './realtime/socket';
-import leaderboardRoute from "./routes/leaderboard";
+import leaderboardRoute from './routes/leaderboard';
 
 const app = express();
 const server = http.createServer(app);
 app.use(express.json());
 app.use(cookieParser());
 
-const FRONTEND_ORIGIN =
-  process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 
 app.use(
   cors({
