@@ -1,6 +1,6 @@
 import { Schema, model } from 'mongoose';
 
-type Lang = 'typescript' | 'python';
+type Lang = 'typescript' | 'python' | 'java';
 type Difficulty = 'easy' | 'medium' | 'hard';
 
 interface IProblem {
@@ -17,6 +17,7 @@ const LangBlockSchema = new Schema<Record<Lang, string>>(
   {
     typescript: { type: String, required: true },
     python: { type: String, required: true },
+    java: { type: String, required: true },
   },
   { _id: false },
 );
