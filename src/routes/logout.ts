@@ -5,7 +5,7 @@ const logoutRoute = Router();
 logoutRoute.post('/logout', (req, res) => {
   res.clearCookie('access', {
     httpOnly: true,
-    sameSite: 'none',
+    sameSite: 'lax',
     path: '/',
     secure: process.env.NODE_ENV !== 'development',
   });

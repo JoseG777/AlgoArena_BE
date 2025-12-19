@@ -16,6 +16,7 @@ function determineLookup(identifyingInput: string) {
 
 loginRoute.post('/login', async (req, res) => {
   const { identifyingInput, password } = req.body;
+  console.log("test");
 
   if (!identifyingInput || !password) {
     return res.status(400).json({
@@ -47,7 +48,7 @@ loginRoute.post('/login', async (req, res) => {
 
     res.cookie('access', token, {
       httpOnly: true,
-      sameSite: 'none',
+      sameSite: 'lax',
       secure: process.env.NODE_ENV !== 'development',
       path: '/',
       maxAge: 60 * 60 * 1000,
