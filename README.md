@@ -43,6 +43,7 @@ NODE_ENV=development
 JUDGE0_API_URL=judge0-ce.p.rapidapi.com
 RAPIDAPI_KEY=your_rapidapi_key (https://rapidapi.com/judge0-official/api/judge0-ce/pricing)
 JUDGE0_API_HOST=judge0-ce.p.rapidapi.com
+```
 
 ## Run Rocally
 
