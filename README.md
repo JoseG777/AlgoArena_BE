@@ -43,3 +43,29 @@ NODE_ENV=development
 JUDGE0_API_URL=judge0-ce.p.rapidapi.com
 RAPIDAPI_KEY=your_rapidapi_key (https://rapidapi.com/judge0-official/api/judge0-ce/pricing)
 JUDGE0_API_HOST=judge0-ce.p.rapidapi.com
+
+## Run Rocally
+
+1. Clone the repository:
+   ```bash
+   git clone <backend-repo-url>
+   ```
+
+2. Navigate into the project directory:
+   ```bash
+   cd repo-name
+   ```
+
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+4. Create a `.env` file in the project root and configure the required environment variables (see **Environment Variables** section).
+
+5. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+The backend will run locally (by default on `http://localhost:3001`).
